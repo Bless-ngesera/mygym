@@ -48,6 +48,6 @@ class User extends Authenticatable
 
     public function scheduledClasses()
     {
-        return $this->hasMany(ScheduledClass::class, 'intructor_id');
+        return $this->hasMany(ScheduledClass::class, 'instructor_id');
     }
 }
