@@ -50,4 +50,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(ScheduledClass::class, 'instructor_id');
     }
+
+    public function bookings()
+    {
+        return $this->belongsToMany(ScheduledClass::class, 'bookings');
+    }
 }
