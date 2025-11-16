@@ -6,7 +6,7 @@
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
+                       <img src="{{ asset('images/Project_Logo.png') }}" alt="MyGym Logo" class="h-20 w-auto">
                     </a>
                 </div>
 
@@ -16,6 +16,7 @@
                         {{ __('Dashboard') }}
                     </x-nav-link>
 
+                    @can('schedule-class')
                     <x-nav-link :href="route('schedule.create')" :active="request()->routeIs('schedule.create')">
                         Schedule a class
                     </x-nav-link>
@@ -23,6 +24,20 @@
                     <x-nav-link :href="route('schedule.index')" :active="request()->routeIs('schedule.index')">
                         Upcoming Classes
                     </x-nav-link>
+                    @endcan
+                    
+
+                    @can('book-class')
+                     <x-nav-link :href="route('booking.create')" :active="request()->routeIs('booking.create')">
+                        Book a Class
+                    </x-nav-link>
+                    <x-nav-link :href="route('booking.index')" :active="request()->routeIs('booking.index')">
+                        Upcoming Classes
+                    </x-nav-link>
+
+                    @endcan
+
+                    
                 </div>
             </div>
 
