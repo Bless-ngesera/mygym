@@ -28,5 +28,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('book-class', function(User $user){
             return $user->role === 'member';
         });
+
+        
     }
 }

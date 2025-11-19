@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ClassCanceled;
 use App\Models\ClassType; // <-- ADDED: Import your ClassType model
 use App\Models\ScheduledClass; // ADDED: Assuming you have this model for the resource
 use Illuminate\Http\Request;
@@ -88,9 +89,15 @@ class ScheduledClassController extends Controller
         // if(auth()->user()->id !== $schedule->instructor_id){
         //     abort(403);
         // }
+        
+        ClassCanceled::dispatch($schedule);
 
+        $schedule->members()->detach();
         $schedule->delete();
+
 
         return redirect()->route('schedule.index');
     }
 }
+
+
