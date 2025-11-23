@@ -5,6 +5,13 @@
         </h2>
     </x-slot>
 
+    {{-- Show payment success message --}}
+    @if(session('success'))
+        <div class="max-w-2xl mx-auto mt-6 mb-4 px-4 py-3 bg-green-100 text-green-800 rounded-lg shadow text-center font-semibold">
+            {{ session('success') }}
+        </div>
+    @endif
+
     <div class="py-12 bg-gray-50 min-h-screen"
         style="background-image: url('{{ asset('images/background2.jpg') }}'); 
         background-size: cover; 
@@ -35,10 +42,15 @@
                     <div class="mt-4 text-right">
                         <form method="post" action="{{ route('booking.store') }}">
                             @csrf
-                            <input type="hidden" name="scheduled_class_id" value="{{ $class->id }}">
-                            <x-primary-button class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-semibold transition">
+                            {{-- Replace submission form/button with modal-opening button --}}
+                            <button 
+                                type="button"
+                                data-id="{{ $class->id }}"
+                                data-name="{{ $class->classType->name }}"
+                                data-price="{{ $class->classType->price ?? 10000 }}"
+                                class="open-payment px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-semibold transition">
                                 Book Class
-                            </x-primary-button>
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -56,6 +68,197 @@
 
         </div>
     </div>
+
+    {{-- Payment Modal --}}
+    <div id="paymentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+        <div class="bg-white rounded-xl max-w-lg w-full p-6">
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">Confirm Payment</h3>
+            <p id="modalClassName" class="text-gray-600 mb-4"></p>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">Price</label>
+                <div id="modalPrice" class="text-2xl font-bold text-gray-900">UGX 0</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <div class="space-y-2">
+                    <label class="flex items-center space-x-2">
+                        <input type="radio" name="payment_method" value="MTN Mobile Money" checked>
+                        <span class="text-sm">MTN Mobile Money (Uganda)</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input type="radio" name="payment_method" value="Airtel Money">
+                        <span class="text-sm">Airtel Money</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input type="radio" name="payment_method" value="PayPal">
+                        <span class="text-sm">PayPal</span>
+                    </label>
+                </div>
+            </div>
+
+            {{-- Payment contact (phone or email) --}}
+            <div id="paymentContactWrap" class="mb-4 hidden">
+                <label id="paymentContactLabel" class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input id="paymentContactInput" type="text" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="">
+                <p id="paymentContactHelp" class="mt-2 text-xs text-gray-400 hidden"></p>
+            </div>
+
+            <div id="paymentStatus" class="text-sm text-gray-600 mb-4 hidden">Processing payment...</div>
+
+            <div class="flex justify-end gap-3">
+                <button id="cancelPayment" class="px-4 py-2 rounded-lg bg-gray-200">Cancel</button>
+                <button id="confirmPayment" class="px-4 py-2 rounded-lg bg-purple-600 text-white font-semibold">Pay</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Payment Success / Redirect will be handled after POST --}}
+    <script>
+        (function(){
+            const openButtons = document.querySelectorAll('.open-payment');
+            const modal = document.getElementById('paymentModal');
+            const modalClassName = document.getElementById('modalClassName');
+            const modalPrice = document.getElementById('modalPrice');
+            const paymentStatus = document.getElementById('paymentStatus');
+            const cancelBtn = document.getElementById('cancelPayment');
+            const confirmBtn = document.getElementById('confirmPayment');
+
+            const contactWrap = document.getElementById('paymentContactWrap');
+            const contactLabel = document.getElementById('paymentContactLabel');
+            const contactInput = document.getElementById('paymentContactInput');
+            const contactHelp = document.getElementById('paymentContactHelp');
+
+            // Ensure CSRF token is available
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+            const storeUrl = "{{ route('receipts.store') }}";
+
+            let currentClassId = null;
+            let currentAmount = 0;
+
+            // formatter for UGX display
+            const fmt = (n) => {
+                try {
+                    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+                } catch (e) {
+                    return Number(n).toFixed(2);
+                }
+            };
+
+            openButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentClassId = btn.getAttribute('data-id');
+                    const name = btn.getAttribute('data-name');
+                    currentAmount = parseFloat(btn.getAttribute('data-price') || 0);
+                    modalClassName.textContent = name;
+                    modalPrice.textContent = 'UGX ' + fmt(currentAmount);
+                    paymentStatus.classList.add('hidden');
+                    // reset contact input
+                    contactInput.value = '';
+                    contactHelp.classList.add('hidden');
+                    contactWrap.classList.add('hidden');
+
+                    // ensure default method selection -> show contact for mobile money by default
+                    const defaultMethod = document.querySelector('input[name="payment_method"]:checked').value;
+                    handleMethodChange(defaultMethod);
+
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                });
+            });
+
+            // handle payment method changes (show contact input and adjust placeholder)
+            const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
+            paymentRadios.forEach(r => r.addEventListener('change', (e) => handleMethodChange(e.target.value)));
+
+            function handleMethodChange(method) {
+                if (!contactWrap) return;
+                if (method === 'MTN Mobile Money' || method === 'Airtel Money') {
+                    contactWrap.classList.remove('hidden');
+                    contactLabel.textContent = 'Mobile Number';
+                    contactInput.type = 'tel';
+                    contactInput.placeholder = '+256 7XX XXX XXX';
+                    contactHelp.textContent = 'Enter the mobile money number to receive a confirmation SMS/payment prompt.';
+                    contactHelp.classList.remove('hidden');
+                } else if (method === 'PayPal') {
+                    contactWrap.classList.remove('hidden');
+                    contactLabel.textContent = 'PayPal Email';
+                    contactInput.type = 'email';
+                    contactInput.placeholder = 'you@example.com';
+                    contactHelp.textContent = 'Enter the PayPal email where payment will be associated.';
+                    contactHelp.classList.remove('hidden');
+                } else {
+                    contactWrap.classList.add('hidden');
+                    contactHelp.classList.add('hidden');
+                }
+            }
+
+            cancelBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            });
+
+            confirmBtn.addEventListener('click', async () => {
+                paymentStatus.textContent = 'Processing payment...';
+                paymentStatus.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                cancelBtn.disabled = true;
+
+                // Simulate processing delay
+                await new Promise(r => setTimeout(r, 1200));
+
+                // read selected method
+                const method = document.querySelector('input[name="payment_method"]:checked').value;
+
+                // validate contact input when shown
+                if (!contactWrap.classList.contains('hidden')) {
+                    const contactVal = contactInput.value.trim();
+                    if (!contactVal) {
+                        paymentStatus.textContent = 'Please enter the required contact (phone or PayPal email).';
+                        confirmBtn.disabled = false;
+                        cancelBtn.disabled = false;
+                        return;
+                    }
+                }
+
+                // Create and submit a standard POST form to let Laravel handle CSRF and redirects
+                try {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = storeUrl;
+                    form.style.display = 'none';
+
+                    // helper to add hidden inputs
+                    const addInput = (name, value) => {
+                        const i = document.createElement('input');
+                        i.type = 'hidden';
+                        i.name = name;
+                        i.value = value;
+                        form.appendChild(i);
+                    };
+
+                    addInput('_token', csrfToken);
+                    addInput('scheduled_class_id', currentClassId);
+                    addInput('payment_method', method);
+                    addInput('amount', currentAmount);
+                    // include contact (if present)
+                    if (!contactWrap.classList.contains('hidden')) {
+                        addInput('payment_contact', contactInput.value.trim());
+                    }
+
+                    document.body.appendChild(form);
+                    form.submit();
+                    // navigation will follow server response; no further UI changes needed here
+                } catch (err) {
+                    paymentStatus.textContent = 'Payment failed. Please try again.';
+                    confirmBtn.disabled = false;
+                    cancelBtn.disabled = false;
+                    console.error(err);
+                }
+            });
+        })();
+    </script>
 
     <footer class="bg-gray-900 border-t border-indigo-500/30">
         <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

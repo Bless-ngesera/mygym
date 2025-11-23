@@ -51,8 +51,17 @@ class User extends Authenticatable
         return $this->hasMany(ScheduledClass::class, 'instructor_id');
     }
 
+   // In App\Models\User.php
     public function bookings()
     {
-        return $this->belongsToMany(ScheduledClass::class, 'bookings');
+        return $this->belongsToMany(ScheduledClass::class, 'bookings', 'user_id', 'scheduled_class_id')
+                    ->withTimestamps();
     }
+
+    public function instructedClasses()
+    {
+        return $this->hasMany(ScheduledClass::class, 'instructor_id');
+    }
+
+
 }
