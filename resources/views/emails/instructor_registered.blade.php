@@ -76,7 +76,9 @@
             <li>💬 Share your expertise</li>
         </ul>
 
-        <a href="{{ url('/login') }}" class="button">Log In to Your Account</a>
+        <a href="{{ route('login') }}" class="button">Log In to Your Account</a>
+
+
 
         <p class="footer">
             Thanks,<br>

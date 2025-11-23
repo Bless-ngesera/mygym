@@ -140,4 +140,13 @@ class EarningsController extends Controller
         ]);
     }
 
+    public function allTransactions()
+{
+    $recentReceipts = Receipt::with(['user', 'scheduledClass.instructor', 'scheduledClass.classType'])
+        ->orderByDesc('created_at')
+        ->paginate(20); // adjust per-page size as needed
+
+    return view('admin.earnings.all', compact('recentReceipts'));
+}
+
 }

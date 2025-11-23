@@ -96,6 +96,7 @@ Route::get('/instructor/payouts', [EarningsController::class, 'payoutReport'])->
 
 require __DIR__.'/auth.php';
 
+
 Route::prefix('admin')->middleware(['auth','role:admin'])->group(function () {
 
     // Dashboard

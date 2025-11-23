@@ -20,9 +20,9 @@ class DashboardController extends Controller
 
             case 'member':
                 return redirect()->route('member.dashboard');
-                
+
             default:
-                return redirect()->route('login');  
+                return redirect()->route('login');
         }
     }
 }
