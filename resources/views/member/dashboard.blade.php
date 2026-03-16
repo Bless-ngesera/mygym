@@ -23,9 +23,9 @@
     </x-slot>
 
     <div class="py-10 bg-gray-50 min-h-screen"
-        style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-        background-size: cover; 
-        background-position: center; 
+        style="background-image: url('{{ asset('images/background2.jpg') }}');
+        background-size: cover;
+        background-position: center;
         background-attachment: fixed;">
 
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
@@ -90,7 +90,7 @@
                             <h4 class="text-lg font-semibold text-gray-800">{{ $class['title'] }}</h4>
                             <p class="text-sm text-gray-600 mt-2">{{ $class['description'] }}</p>
                             <p class="text-sm text-indigo-600 font-semibold mt-2">{{ $class['schedule'] }}</p>
-                            <a href="{{ route('booking.create') }}"
+                            <a href="{{ route('bookings.create') }}"
                                class="inline-block text-indigo-600 hover:text-indigo-800 font-semibold mt-3">Join Now</a>
                         </div>
                     @endforeach
@@ -187,7 +187,7 @@
                     <h5 class="text-lg font-semibold text-white mb-4">Quick Links</h5>
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Dashboard</a></li>
-                        <li><a href="{{ route('booking.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
+                        <li><a href="{{ route('bookings.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Manage Profile</a></li>
                         <li><a href="#" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Contact Support</a></li>
                     </ul>

@@ -10,10 +10,13 @@ class CreatePaymentsTable extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
+            // member_id now references users table
+            $table->foreignId('member_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('instructor_id')->nullable()->constrained('instructors')->nullOnDelete();
             $table->decimal('amount', 12, 2)->default(0);
             $table->timestamp('paid_at')->nullable();
+            $table->string('reference')->unique()->nullable();
+            $table->string('status')->default('pending');
             $table->timestamps();
         });
     }

@@ -1,122 +1,114 @@
 <?php
 
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ScheduledClassController;
-use App\Http\Controllers\BookingController;
-use App\Http\Controllers\ReceiptController;
-use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\EarningsController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ScheduledClassController;
+use App\Http\Controllers\ReceiptController;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// Public routes
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('home');
 
-Route::get('/dashboard', DashboardController::class)
-    ->middleware(['auth'])
-    ->name('dashboard');
-
-Route::get('/instructor/dashboard', function () {
-    return view('instructor.dashboard');
-})->middleware(['auth','role:instructor'])->name('instructor.dashboard');
-
-Route::resource('/instructor/schedule', ScheduledClassController::class)
-    ->only(['index','create','store','destroy'])
-    ->middleware(['auth','role:instructor']);
-
-/* Member routes */
-Route::middleware(['auth','role:member'])->group(function() {
-    Route::get('/member/dashboard', function () {
-        return view('member.dashboard');
-    })->name('member.dashboard');
-
-    Route::get('/member/book', [BookingController::class, 'create'])->name('booking.create');
-    Route::post('/member/bookings', [BookingController::class, 'store'])->name('booking.store');
-    Route::get('/member/bookings', [BookingController::class, 'index'])->name('booking.index');
-    Route::delete('/member/bookings/{id}', [BookingController::class, 'destroy'])->name('booking.destroy');
-});
-
+// Authenticated routes
 Route::middleware('auth')->group(function () {
+
+    // Dashboard (uses __invoke method)
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    // Bookings
+    Route::prefix('bookings')->name('bookings.')->group(function () {
+        Route::get('/', [BookingController::class, 'index'])->name('index');
+        Route::get('/create', [BookingController::class, 'create'])->name('create');
+        Route::post('/', [BookingController::class, 'store'])->name('store');
+        Route::delete('/{id}', [BookingController::class, 'destroy'])->name('destroy');
+    });
+
+    // Scheduled Classes (Full Resource Controller)
+    Route::resource('classes', ScheduledClassController::class)->parameters([
+        'classes' => 'scheduledClass'
+    ]);
+
+    // Receipts
+    Route::prefix('receipts')->name('receipts.')->group(function () {
+        Route::post('/', [ReceiptController::class, 'store'])->name('store');
+        Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
+    });
+
+    // Admin routes - using your CheckUserRole middleware with 'admin' parameter
+    Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
+
+        // Admin Dashboard
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        // Admin main dashboard (legacy)
+        Route::get('/', [AdminController::class, 'dashboard'])->name('index');
+
+        // Earnings
+        Route::prefix('earnings')->name('earnings.')->group(function () {
+            Route::get('/', [EarningsController::class, 'index'])->name('index');
+            Route::get('/data', [EarningsController::class, 'earningsData'])->name('data');
+            Route::get('/export-pdf', [EarningsController::class, 'exportPdf'])->name('export.pdf');
+            Route::get('/export-csv', [EarningsController::class, 'exportCsv'])->name('export.csv');
+            Route::get('/export-excel', [EarningsController::class, 'exportExcel'])->name('export.excel');
+            Route::get('/instructor-payout', [EarningsController::class, 'instructorPayoutReport'])->name('instructor.payout');
+            Route::get('/all', [EarningsController::class, 'all'])->name('all');
+            Route::get('/transactions', [EarningsController::class, 'allTransactions'])->name('transactions');
+        });
+
+        // Instructor Management
+        Route::prefix('instructors')->name('instructors.')->group(function () {
+            Route::get('/', [AdminController::class, 'indexInstructors'])->name('index');
+            Route::get('/create', [AdminController::class, 'createInstructor'])->name('create');
+            Route::post('/', [AdminController::class, 'storeInstructor'])->name('store');
+            Route::get('/{id}/edit', [AdminController::class, 'editInstructor'])->name('edit');
+            Route::put('/{id}', [AdminController::class, 'updateInstructor'])->name('update');
+            Route::delete('/{id}', [AdminController::class, 'destroyInstructor'])->name('destroy');
+            Route::get('/download-pdf', [AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
+        });
+
+        // Reports
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [ReportsController::class, 'index'])->name('index');
+            Route::post('/generate', [ReportsController::class, 'generate'])->name('generate');
+            Route::get('/download-pdf', [ReportsController::class, 'downloadPdf'])->name('download.pdf');
+            Route::get('/download-excel', [ReportsController::class, 'downloadExcel'])->name('download.excel');
+            Route::get('/download-instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
+        });
+    });
+
+    // Instructor routes - using your CheckUserRole middleware with 'instructor' parameter
+    Route::prefix('instructor')->name('instructor.')->middleware('role:instructor')->group(function () {
+        // Add instructor-specific routes here
+        Route::get('/dashboard', function () {
+            return view('instructor.dashboard');
+        })->name('dashboard');
+
+        Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
+        Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
+    });
+
+    // Profile routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::post('/receipts', [ReceiptController::class, 'store'])->name('receipts.store');
-    Route::get('/receipts/{receipt}', [ReceiptController::class, 'show'])->name('receipts.show');
+    // Member dashboard
+    Route::get('/member/dashboard', function () {
+        return view('member.dashboard'); // Make sure this view exists
+    })->name('member.dashboard');
 });
-
-/* ===========================
-   ADMIN ROUTES
-   =========================== */
-Route::prefix('admin')->middleware(['auth','role:admin'])->group(function () {
-
-    // Dashboard
-    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-
-    // Instructors CRUD
-    Route::get('/instructors', [AdminController::class, 'indexInstructors'])->name('admin.instructors.index');
-    Route::get('/instructors/create', [AdminController::class, 'createInstructor'])->name('admin.instructors.create');
-    Route::post('/instructors', [AdminController::class, 'storeInstructor'])->name('admin.instructors.store');
-    Route::get('/instructors/{id}/edit', [AdminController::class, 'editInstructor'])->name('admin.instructors.edit');
-    Route::put('/instructors/{id}', [AdminController::class, 'updateInstructor'])->name('admin.instructors.update');
-    Route::delete('/instructors/{id}', [AdminController::class, 'destroyInstructor'])->name('admin.instructors.destroy');
-
-    // Members
-    Route::get('/members', function () {
-        $members = \App\Models\User::where('role', 'member')->orderByDesc('created_at')->get();
-        return view('admin.members.index', compact('members'));
-    })->name('admin.members.index');
-
-    // Earnings
-    Route::get('/earnings', [AdminController::class, 'earnings'])->name('admin.earnings');
-    Route::get('/earnings-data', [AdminController::class, 'earningsData'])->name('admin.earningsData');
-    Route::get('/earnings/pdf', [AdminController::class, 'exportPdf'])->name('admin.earnings.pdf');
-    Route::get('/earnings/csv', [AdminController::class, 'exportCsv'])->name('admin.earnings.csv');
-
-    // Reports
-    Route::get('/reports', [ReportsController::class, 'index'])->name('admin.reports.index');
-    Route::post('/reports/generate', [ReportsController::class, 'generate'])->name('reports.generate');
-    Route::get('/reports/pdf', [ReportsController::class, 'downloadPdf'])->name('reports.pdf');
-    Route::get('/reports/excel', [ReportsController::class, 'downloadExcel'])->name('reports.excel');
-
-    // If you want a separate Instructor PDF, keep this route ONLY if you add the method in ReportsController
-    // Otherwise, remove it and use reports.pdf?type=instructors
-    Route::get('/reports/instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])
-        ->name('admin.reports.instructor-pdf');
-
-    // Settings
-    Route::get('/settings', function () {
-        return view('admin.settings');
-    })->name('admin.settings.index');
-});
-
-Route::get('/instructor/payouts', [EarningsController::class, 'payoutReport'])->name('instructors.payouts');
 
 require __DIR__.'/auth.php';
-
-
-Route::prefix('admin')->middleware(['auth','role:admin'])->group(function () {
-
-    // Dashboard
-    Route::get('/dashboard', [AdminController::class, 'dashboard'])
-        ->name('admin.dashboard');
-
-    // Earnings overview page
-    Route::get('/earnings', [EarningsController::class, 'index'])
-        ->name('admin.earnings');
-
-    // Export routes
-    Route::get('/earnings/pdf', [EarningsController::class, 'exportPdf'])
-        ->name('earnings.pdf');
-    Route::get('/earnings/csv', [EarningsController::class, 'exportCsv'])
-        ->name('earnings.csv');
-    Route::get('/earnings/excel', [EarningsController::class, 'exportExcel'])
-        ->name('earnings.excel');
-
-    // View all transactions
-    Route::get('/earnings/all', [EarningsController::class, 'allTransactions'])
-        ->name('admin.earnings.all');
-});
-

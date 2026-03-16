@@ -13,15 +13,15 @@
     @endif
 
     <div class="py-12 bg-gray-50 min-h-screen"
-        style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-        background-size: cover; 
-        background-position: center; 
+        style="background-image: url('{{ asset('images/background2.jpg') }}');
+        background-size: cover;
+        background-position: center;
         background-attachment: fixed;">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @forelse ($scheduledClasses as $class)
                 <div class="bg-white/75 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden p-8">
-                    
+
                     <div class="flex flex-col md:flex-row justify-between gap-6">
                         <!-- Class Info -->
                         <div>
@@ -43,7 +43,7 @@
                         <form method="post" action="{{ route('booking.store') }}">
                             @csrf
                             {{-- Replace submission form/button with modal-opening button --}}
-                            <button 
+                            <button
                                 type="button"
                                 data-id="{{ $class->id }}"
                                 data-name="{{ $class->classType->name }}"
@@ -59,7 +59,7 @@
                 <div class="bg-white shadow-lg rounded-xl p-6 text-center space-y-4">
                     <p class="text-gray-700 text-lg font-medium">No classes are currently scheduled.</p>
                     <p class="text-gray-500">Please check back later or add a new class schedule.</p>
-                    <a href="{{ route('schedule.create') }}" 
+                    <a href="{{ route('schedule.create') }}"
                        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2 rounded-lg transition">
                         Create a Schedule
                     </a>
