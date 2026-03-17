@@ -6,15 +6,15 @@
     </x-slot>
 
      <div class="py-12"
-        style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-        background-size: cover; 
-        background-position: center; 
+        style="background-image: url('{{ asset('images/background2.jpg') }}');
+        background-size: cover;
+        background-position: center;
         background-attachment: fixed;">
-        
+
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white/55 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden p-8">
                 <div class="p-10 text-gray-900">
-                    <form action="{{ route('schedule.store') }}" method="post" class="max-w-lg">
+                    <form action="{{ route('classes.store') }}" method="post" class="max-w-lg">
                         @csrf
                         <div class="space-y-6">
                             <div>

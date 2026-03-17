@@ -12,9 +12,63 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                    <!-- Dashboard Link (always visible) -->
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+                        Dashboard
                     </x-nav-link>
+
+                    <!-- Role-Based Navigation Links -->
+                    @auth
+                        @if(auth()->user()->role === 'member')
+                            <x-nav-link :href="route('bookings.index')" :active="request()->routeIs('bookings.*')">
+                                My Bookings
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                                Classes
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('bookings.create')" :active="request()->routeIs('bookings.create')">
+                                Book a Class
+                            </x-nav-link>
+                        @endif
+
+                        @if(auth()->user()->role === 'instructor')
+                            <x-nav-link :href="route('instructor.dashboard')" :active="request()->routeIs('instructor.dashboard')">
+                                Instructor Dashboard
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('instructor.classes')" :active="request()->routeIs('instructor.classes')">
+                                My Classes
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">
+                                My Earnings
+                            </x-nav-link>
+                        @endif
+
+                        @if(auth()->user()->role === 'admin')
+                            <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
+                                Admin Dashboard
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('admin.earnings.index')" :active="request()->routeIs('admin.earnings.*')">
+                                Earnings
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('admin.instructors.index')" :active="request()->routeIs('admin.instructors.*')">
+                                Instructors
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">
+                                Reports
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                                Manage Classes
+                            </x-nav-link>
+                        @endif
+                    @endauth
                 </div>
             </div>
 
@@ -34,18 +88,44 @@
                     </x-slot>
 
                     <x-slot name="content">
+                        <!-- User Role Indicator -->
+                        <div class="px-4 py-2 text-xs text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                            Role: <span class="font-semibold uppercase">{{ Auth::user()->role }}</span>
+                        </div>
+
                         <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
+                            Profile
                         </x-dropdown-link>
+
+                        <!-- Role-based quick links -->
+                        @if(auth()->user()->role === 'member')
+                            <x-dropdown-link :href="route('bookings.index')">
+                                My Bookings
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('bookings.create')">
+                                Book a Class
+                            </x-dropdown-link>
+                        @endif
+
+                        @if(auth()->user()->role === 'admin')
+                            <x-dropdown-link :href="route('admin.dashboard')">
+                                Admin Panel
+                            </x-dropdown-link>
+                        @endif
+
+                        @if(auth()->user()->role === 'instructor')
+                            <x-dropdown-link :href="route('instructor.dashboard')">
+                                Instructor Panel
+                            </x-dropdown-link>
+                        @endif
 
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-
                             <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault();
                                                 this.closest('form').submit();">
-                                {{ __('Log Out') }}
+                                Log Out
                             </x-dropdown-link>
                         </form>
                     </x-slot>
@@ -64,34 +144,88 @@
         </div>
     </div>
 
-    <!-- Responsive Navigation Menu -->
+    <!-- Responsive Navigation Menu (Mobile) -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
+            <!-- Dashboard (Mobile) -->
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
+                Dashboard
             </x-responsive-nav-link>
+
+            <!-- Mobile Role-Based Links -->
+            @auth
+                @if(auth()->user()->role === 'member')
+                    <x-responsive-nav-link :href="route('bookings.index')" :active="request()->routeIs('bookings.*')">
+                        My Bookings
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                        Classes
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('bookings.create')" :active="request()->routeIs('bookings.create')">
+                        Book a Class
+                    </x-responsive-nav-link>
+                @endif
+
+                @if(auth()->user()->role === 'instructor')
+                    <x-responsive-nav-link :href="route('instructor.dashboard')" :active="request()->routeIs('instructor.dashboard')">
+                        Instructor Dashboard
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('instructor.classes')" :active="request()->routeIs('instructor.classes')">
+                        My Classes
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">
+                        My Earnings
+                    </x-responsive-nav-link>
+                @endif
+
+                @if(auth()->user()->role === 'admin')
+                    <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
+                        Admin Dashboard
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('admin.earnings.index')" :active="request()->routeIs('admin.earnings.*')">
+                        Earnings
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('admin.instructors.index')" :active="request()->routeIs('admin.instructors.*')">
+                        Instructors
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">
+                        Reports
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                        Manage Classes
+                    </x-responsive-nav-link>
+                @endif
+            @endauth
         </div>
 
-        <!-- Responsive Settings Options -->
+        <!-- Responsive Settings Options (Mobile) -->
         <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
             <div class="px-4">
                 <div class="font-medium text-base text-gray-800 dark:text-gray-200">{{ Auth::user()->name }}</div>
                 <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
+                <div class="text-xs text-gray-400 mt-1">Role: {{ ucfirst(Auth::user()->role) }}</div>
             </div>
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
+                    Profile
                 </x-responsive-nav-link>
 
                 <!-- Authentication -->
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-
                     <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault();
                                         this.closest('form').submit();">
-                        {{ __('Log Out') }}
+                        Log Out
                     </x-responsive-nav-link>
                 </form>
             </div>

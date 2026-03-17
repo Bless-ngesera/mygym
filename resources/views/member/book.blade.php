@@ -40,7 +40,7 @@
 
                     <!-- Booking Button -->
                     <div class="mt-4 text-right">
-                        <form method="post" action="{{ route('booking.store') }}">
+                        <form method="post" action="{{ route('bookings.store') }}">
                             @csrf
                             {{-- Replace submission form/button with modal-opening button --}}
                             <button
@@ -59,7 +59,7 @@
                 <div class="bg-white shadow-lg rounded-xl p-6 text-center space-y-4">
                     <p class="text-gray-700 text-lg font-medium">No classes are currently scheduled.</p>
                     <p class="text-gray-500">Please check back later or add a new class schedule.</p>
-                    <a href="{{ route('schedule.create') }}"
+                    <a href="{{ route('classes.create') }}"
                        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2 rounded-lg transition">
                         Create a Schedule
                     </a>
@@ -284,7 +284,7 @@
                     <h5 class="text-lg font-semibold text-white mb-4">Quick Links</h5>
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Dashboard</a></li>
-                        <li><a href="{{ route('booking.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
+                        <li><a href="{{ route('bookings.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Manage Profile</a></li>
                         <li><a href="#" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Contact Support</a></li>
                     </ul>

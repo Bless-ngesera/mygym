@@ -6,11 +6,11 @@
     </x-slot>
 
     <div class="py-12 bg-gray-50 min-h-screen"
-        style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-        background-size: cover; 
-        background-position: center; 
+        style="background-image: url('{{ asset('images/background2.jpg') }}');
+        background-size: cover;
+        background-position: center;
         background-attachment: fixed;">
-        
+
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @forelse ($bookings as $class)
@@ -32,10 +32,10 @@
 
                     <!-- Cancel Button -->
                     <div class="mt-4 text-right">
-                        <form method="post" action="{{ route('booking.destroy', $class->id) }}">
+                        <form method="post" action="{{ route('bookings.destroy', $class->id) }}">
                             @csrf
                             @method('delete')
-                            <x-danger-button 
+                            <x-danger-button
                                 class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition"
                                 onclick="return confirm('Are you sure you want to cancel this class?')">
                                 Cancel Booking
@@ -53,7 +53,7 @@
                     <p class="text-gray-500">
                         Browse available classes and book one to stay on track with your fitness goals!
                     </p>
-                    <a href="{{ route('booking.create') }}" 
+                    <a href="{{ route('bookings.create') }}"
                        class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2 rounded-lg transition">
                         Browse Classes
                     </a>
@@ -87,7 +87,7 @@
                     <h5 class="text-lg font-semibold text-white mb-4">Quick Links</h5>
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Dashboard</a></li>
-                        <li><a href="{{ route('booking.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
+                        <li><a href="{{ route('bookings.create') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Book a Class</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Manage Profile</a></li>
                         <li><a href="#" class="text-sm text-gray-400 hover:text-indigo-400 transition duration-300">Contact Support</a></li>
                     </ul>

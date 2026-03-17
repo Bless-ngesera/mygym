@@ -6,11 +6,11 @@
     </x-slot>
 
     <div class="py-12"
-      style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-      background-size: cover; 
-      background-position: center; 
+      style="background-image: url('{{ asset('images/background2.jpg') }}');
+      background-size: cover;
+      background-position: center;
       background-attachment: fixed;">
-      
+
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white/75 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden p-8">
                 <div class="p-6 text-gray-900 max-w-xl divide-y">
@@ -27,7 +27,7 @@
                         </div>
                      </div>
                      <div class="mt-1 text-right">
-                        <form method="post" action="{{ route('schedule.destroy', $class) }}">
+                        <form method="post" action="{{ route('classes.destroy', $class) }}">
                            @csrf
                            @method('DELETE')
                            <x-danger-button class="px-3 py-1">Cancel</x-danger-button>
@@ -37,7 +37,7 @@
                   @empty
                   <div>
                      <p>You don't have any upcoming classes</p>
-                     <a class="inline-block mt-6 underline text-sm" href="{{ route('schedule.create') }}">
+                     <a class="inline-block mt-6 underline text-sm" href="{{ route('classes.create') }}">
                         Schedule now
                      </a>
                   </div>

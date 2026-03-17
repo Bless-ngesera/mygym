@@ -109,6 +109,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/member/dashboard', function () {
         return view('member.dashboard'); // Make sure this view exists
     })->name('member.dashboard');
+
+    // Receipts - Add this inside the authenticated routes group
+    Route::prefix('receipts')->name('receipts.')->group(function () {
+        // For listing receipts - you'll need to add this method to controller later
+        // Route::get('/', [ReceiptController::class, 'index'])->name('index');
+
+        // Store receipt (from payment)
+        Route::post('/', [ReceiptController::class, 'store'])->name('store');
+
+        // Show individual receipt
+        Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
+    });
 });
 
 require __DIR__.'/auth.php';
