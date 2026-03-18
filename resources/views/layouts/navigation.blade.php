@@ -48,10 +48,6 @@
                         @endif
 
                         @if(auth()->user()->role === 'admin')
-                            <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
-                                Admin Dashboard
-                            </x-nav-link>
-
                             <x-nav-link :href="route('admin.earnings.index')" :active="request()->routeIs('admin.earnings.*')">
                                 Earnings
                             </x-nav-link>
@@ -62,10 +58,6 @@
 
                             <x-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">
                                 Reports
-                            </x-nav-link>
-
-                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
-                                Manage Classes
                             </x-nav-link>
                         @endif
                     @endauth

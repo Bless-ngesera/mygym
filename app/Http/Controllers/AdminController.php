@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Booking;
 use App\Models\Receipt;
 use App\Models\User;
+use App\Models\ScheduledClass;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
@@ -23,43 +24,92 @@ class AdminController extends Controller
     }
 
     /**
-     * Dashboard overview (recent members + plan income summary included)
+     * Dashboard overview with comprehensive stats
      */
     public function dashboard()
     {
-        $totalBookings   = Booking::count();
-        $totalRevenue    = Receipt::sum('amount');
-        $recentBookings  = Booking::with(['user', 'scheduledClass.classType'])
+        // Total counts
+        $totalUsers = User::count();
+        $totalMembers = User::where('role', 'member')->count();
+        $totalInstructors = User::where('role', 'instructor')->count();
+        $totalBookings = Booking::count();
+        $totalRevenue = Receipt::sum('amount') ?? 0;
+        $totalClasses = ScheduledClass::count();
+
+        // Recent data for tables
+        $recentMembers = User::where('role', 'member')
             ->latest()
             ->take(5)
             ->get();
 
-        // Recent members
-        $recentMembers = User::where('role', 'member')
-            ->orderByDesc('created_at')
-            ->take(5)
-            ->get();
-
-        // Recent instructors
         $recentInstructors = User::where('role', 'instructor')
-            ->orderByDesc('created_at')
+            ->latest()
             ->take(5)
             ->get();
 
-        // Stats cards
-        $totalMembers = User::where('role', 'member')->count();
-        $totalInstructors = User::where('role', 'instructor')->count();
-        $totalClasses = \App\Models\ScheduledClass::count();
+        $recentBookings = Booking::with(['user', 'scheduledClass.classType'])
+            ->latest()
+            ->take(5)
+            ->get();
+
+        // Chart data - Last 12 months earnings
+        $monthlyLabels = [];
+        $monthlyEarnings = [];
+
+        for ($i = 11; $i >= 0; $i--) {
+            $month = Carbon::now()->subMonths($i);
+            $monthlyLabels[] = $month->format('M Y');
+
+            $earnings = Receipt::whereYear('created_at', $month->year)
+                ->whereMonth('created_at', $month->month)
+                ->sum('amount');
+
+            $monthlyEarnings[] = $earnings;
+        }
+
+        // Instructor earnings breakdown
+        $instructorEarnings = User::where('role', 'instructor')
+            ->with('receipts')
+            ->get()
+            ->map(function ($instructor) {
+                return (object) [
+                    'name' => $instructor->name,
+                    'amount' => $instructor->receipts->sum('amount') ?? 0
+                ];
+            })
+            ->filter(function ($item) {
+                return $item->amount > 0;
+            })
+            ->values();
+
+        // Plan earnings (if you have plans)
+        $planEarnings = collect([]); // Add your plan earnings logic here if needed
+
+        // All data for modals
+        $allMembers = User::where('role', 'member')
+            ->latest()
+            ->get();
+
+        $allInstructors = User::where('role', 'instructor')
+            ->latest()
+            ->get();
 
         return view('admin.dashboard', compact(
-            'totalBookings',
-            'totalRevenue',
-            'recentBookings',
-            'recentMembers',
-            'recentInstructors',
+            'totalUsers',
             'totalMembers',
             'totalInstructors',
-            'totalClasses'
+            'totalBookings',
+            'totalRevenue',
+            'totalClasses',
+            'recentMembers',
+            'recentInstructors',
+            'recentBookings',
+            'monthlyLabels',
+            'monthlyEarnings',
+            'instructorEarnings',
+            'planEarnings',
+            'allMembers',
+            'allInstructors'
         ));
     }
 
@@ -68,19 +118,20 @@ class AdminController extends Controller
      */
     public function earnings()
     {
-        $totalEarnings = Receipt::sum('amount');
+        $totalEarnings = Receipt::sum('amount') ?? 0;
 
         $monthEarnings = Receipt::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
-            ->sum('amount');
+            ->sum('amount') ?? 0;
 
-        $pendingPayouts = 0; // You can calculate this based on your business logic
+        $pendingPayouts = 0; // Calculate based on your business logic
 
         $recentTransactions = Receipt::with('user')
             ->latest()
             ->take(10)
             ->get();
 
+        // Monthly stats for chart
         $monthlyStats = Receipt::select(
                 DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month_key'),
                 DB::raw('DATE_FORMAT(created_at, "%b") as month_label'),
@@ -110,7 +161,7 @@ class AdminController extends Controller
     }
 
     /**
-     * JSON endpoint for Chart.js
+     * JSON endpoint for Chart.js dynamic updates
      */
     public function earningsData(Request $request)
     {
@@ -149,9 +200,9 @@ class AdminController extends Controller
             ->latest()
             ->get();
 
-        // Create CSV using League\Csv\Writer (fixed deprecated method)
+        // Create CSV using League\Csv\Writer
         $csv = Writer::createFromString();
-        $csv->insertOne(['ID', 'User', 'Class', 'Payment Method', 'Amount', 'Reference', 'Date']);
+        $csv->insertOne(['ID', 'User', 'Class', 'Payment Method', 'Amount (UGX)', 'Reference', 'Date']);
 
         foreach ($receipts as $receipt) {
             $csv->insertOne([
@@ -159,7 +210,7 @@ class AdminController extends Controller
                 optional($receipt->user)->name ?? 'N/A',
                 optional(optional($receipt->scheduledClass)->classType)->name ?? 'N/A',
                 $receipt->payment_method,
-                number_format($receipt->amount, 2),
+                number_format($receipt->amount, 0),
                 $receipt->reference_number ?? 'N/A',
                 $receipt->created_at->format('Y-m-d'),
             ]);
@@ -176,7 +227,25 @@ class AdminController extends Controller
     }
 
     /**
-     * Member CRUD
+     * Export all instructors as PDF
+     */
+    public function downloadInstructorPdf()
+    {
+        $instructors = User::where('role', 'instructor')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $pdf = Pdf::loadView('admin.reports.instructors-pdf', compact('instructors'));
+
+        return $pdf->download('instructors-report-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    /**
+     * ==================== MEMBER CRUD ====================
+     */
+
+    /**
+     * Display a listing of members
      */
     public function members()
     {
@@ -187,11 +256,17 @@ class AdminController extends Controller
         return view('admin.members.index', compact('members'));
     }
 
+    /**
+     * Show form to create a new member
+     */
     public function createMember()
     {
         return view('admin.members.create');
     }
 
+    /**
+     * Store a newly created member
+     */
     public function storeMember(Request $request)
     {
         $validated = $request->validate([
@@ -217,12 +292,18 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * Show form to edit a member
+     */
     public function editMember($id)
     {
         $member = User::where('role', 'member')->findOrFail($id);
         return view('admin.members.edit', compact('member'));
     }
 
+    /**
+     * Update the specified member
+     */
     public function updateMember(Request $request, $id)
     {
         $validated = $request->validate([
@@ -254,6 +335,9 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * Remove the specified member
+     */
     public function destroyMember($id)
     {
         try {
@@ -263,6 +347,12 @@ class AdminController extends Controller
             if ($member->bookings()->exists()) {
                 return redirect()->route('admin.members.index')
                     ->withErrors(['error' => 'Cannot delete member with existing bookings.']);
+            }
+
+            // Check if member has receipts
+            if ($member->receipts()->exists()) {
+                return redirect()->route('admin.members.index')
+                    ->withErrors(['error' => 'Cannot delete member with payment history.']);
             }
 
             $member->delete();
@@ -276,7 +366,11 @@ class AdminController extends Controller
     }
 
     /**
-     * Instructor CRUD
+     * ==================== INSTRUCTOR CRUD ====================
+     */
+
+    /**
+     * Display a listing of instructors
      */
     public function indexInstructors()
     {
@@ -287,11 +381,17 @@ class AdminController extends Controller
         return view('admin.instructors.index', compact('instructors'));
     }
 
+    /**
+     * Show form to create a new instructor
+     */
     public function createInstructor()
     {
         return view('admin.instructors.create');
     }
 
+    /**
+     * Store a newly created instructor
+     */
     public function storeInstructor(Request $request)
     {
         $validated = $request->validate([
@@ -309,10 +409,13 @@ class AdminController extends Controller
                 'role'     => 'instructor',
             ]);
 
-            // Store password to include in email
-            $user->plain_password = $password;
-
-            Mail::to($user->email)->send(new InstructorRegisteredMail($user));
+            // Send email with password
+            try {
+                Mail::to($user->email)->send(new InstructorRegisteredMail($user, $password));
+            } catch (\Throwable $mailError) {
+                // Log mail error but don't stop the process
+                \Log::error('Failed to send instructor registration email: ' . $mailError->getMessage());
+            }
 
             return redirect()->route('admin.instructors.index')
                 ->with('success', 'Instructor registered successfully. Password has been sent to their email.');
@@ -323,12 +426,18 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * Show form to edit an instructor
+     */
     public function editInstructor($id)
     {
         $instructor = User::where('role', 'instructor')->findOrFail($id);
         return view('admin.instructors.edit', compact('instructor'));
     }
 
+    /**
+     * Update the specified instructor
+     */
     public function updateInstructor(Request $request, $id)
     {
         $validated = $request->validate([
@@ -349,6 +458,9 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * Remove the specified instructor
+     */
     public function destroyInstructor($id)
     {
         try {
@@ -360,6 +472,12 @@ class AdminController extends Controller
                     ->withErrors(['error' => 'Cannot delete instructor with existing classes.']);
             }
 
+            // Check if instructor has receipts/earnings
+            if ($instructor->receipts()->exists()) {
+                return redirect()->route('admin.instructors.index')
+                    ->withErrors(['error' => 'Cannot delete instructor with earnings history.']);
+            }
+
             $instructor->delete();
 
             return redirect()->route('admin.instructors.index')
@@ -368,16 +486,5 @@ class AdminController extends Controller
             return redirect()->route('admin.instructors.index')
                 ->withErrors(['error' => 'Unable to delete instructor: ' . $e->getMessage()]);
         }
-    }
-
-    public function downloadInstructorPdf()
-    {
-        $instructors = User::where('role', 'instructor')
-            ->orderByDesc('created_at')
-            ->get();
-
-        $pdf = Pdf::loadView('admin.reports.instructors-pdf', compact('instructors'));
-
-        return $pdf->download('instructors-report-' . now()->format('Y-m-d') . '.pdf');
     }
 }
