@@ -149,10 +149,10 @@
 
             <a href="{{ route('admin.earnings.index') }}"
                class="flex items-center px-3 py-2.5 rounded-xl transition-all duration-200 group
-               {{ request()->routeIs('admin.earnings.*') ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">
+               {{ request()->routeIs('admin.earnings.*') ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 text-indigo-700' }}">
                 <span class="flex items-center justify-center w-8 h-8 rounded-lg mr-3 flex-shrink-0
-                    {{ request()->routeIs('admin.earnings.*') ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-emerald-100' }}">
-                    <svg class="w-4 h-4 {{ request()->routeIs('admin.earnings.*') ? 'text-white' : 'text-gray-500 group-hover:text-emerald-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {{ request()->routeIs('admin.earnings.*') ? 'bg-white/20' : 'bg-indigo-100' }}">
+                    <svg class="w-4 h-4 {{ request()->routeIs('admin.earnings.*') ? 'text-white' : 'text-indigo-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </span>
@@ -214,76 +214,159 @@
         </div>
     </aside>
 
-    {{-- Main Content with proper margin adjustment --}}
+    {{-- Main Content with proper margin adjustment and background image --}}
     <div id="mainContent" class="transition-all duration-300 ease-in-out">
-        <div class="py-6">
-            <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <main class="min-h-screen overflow-y-auto"
+              style="background-image: url('{{ asset('images/background2.jpg') }}');
+                     background-size: cover;
+                     background-position: center;
+                     background-attachment: fixed;">
+            <div class="p-4 md:p-6 lg:p-8">
+                <div class="max-w-6xl mx-auto space-y-6">
 
-                <!-- Receipts Table -->
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-lg text-gray-800">Receipts</h3>
-                        <div class="text-sm text-gray-500">
-                            Showing {{ $recentReceipts->firstItem() ?? 0 }}–{{ $recentReceipts->lastItem() ?? 0 }}
-                            of {{ $recentReceipts->total() ?? 0 }}
+                    {{-- Summary Stats Cards (Optional - you can add KPI cards here if needed) --}}
+                    @if(isset($totalEarnings) || isset($totalTransactions))
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">Total</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">UGX {{ number_format($totalEarnings ?? 0, 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">Total Earnings</div>
+                        </div>
+
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{{ $recentReceipts->total() ?? 0 }}</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">{{ number_format($recentReceipts->total() ?? 0, 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">Total Transactions</div>
+                        </div>
+
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Average</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">UGX {{ number_format(($totalEarnings ?? 0) / max($recentReceipts->total() ?? 1, 1), 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">Average Transaction</div>
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- Receipts Table with Glass-morphism --}}
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-lg">All Receipts</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">Complete transaction history</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">
+                                    Showing {{ $recentReceipts->firstItem() ?? 0 }} – {{ $recentReceipts->lastItem() ?? 0 }}
+                                    of {{ $recentReceipts->total() ?? 0 }}
+                                </div>
+                                <a href="{{ route('admin.earnings.export.csv') }}"
+                                   class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg inline-flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    Export CSV
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-50/80">
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Reference</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Member</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Instructor</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Class</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Payment</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    @forelse ($recentReceipts as $r)
+                                        <tr class="hover:bg-indigo-50/30 transition-colors duration-150">
+                                            <td class="px-5 py-3.5 text-sm font-mono text-gray-600">
+                                                {{ $r->reference_number ?? '-' }}
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <div class="flex items-center gap-2">
+                                                    <img src="https://ui-avatars.com/api/?name={{ urlencode(optional($r->user)->name ?? 'Member') }}&background=10b981&color=fff&bold=true"
+                                                         alt="" class="w-6 h-6 rounded-lg">
+                                                    <span class="text-sm font-medium text-gray-800">{{ optional($r->user)->name ?? 'Unknown Member' }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3.5 text-sm text-gray-600">
+                                                {{ optional(optional($r->scheduledClass)->instructor)->name ?? 'Unknown Instructor' }}
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-lg">
+                                                    {{ optional(optional($r->scheduledClass)->classType)->name ?? 'Unknown Class' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+                                                    {{ $r->payment_method ?? '-' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-sm font-semibold text-emerald-600">UGX {{ number_format($r->amount ?? 0, 0) }}</span>
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                                                    {{ optional($r->created_at)->format('M d, Y') }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="px-5 py-8 text-center">
+                                                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                </div>
+                                                <p class="text-sm text-gray-400 font-medium">No receipts found.</p>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Pagination with glass-morphism --}}
+                        <div class="mt-6">
+                            @if($recentReceipts->hasPages())
+                                <div class="flex justify-center">
+                                    {{ $recentReceipts->onEachSide(1)->links('vendor.pagination.tailwind') }}
+                                </div>
+                            @endif
                         </div>
                     </div>
 
-                    <div class="overflow-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Reference</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Member</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Instructor</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Class</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Payment method</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Amount (UGX)</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 bg-white">
-                                @forelse ($recentReceipts as $r)
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-2 text-sm font-mono text-gray-700">
-                                            {{ $r->reference_number ?? '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ optional($r->user)->name ?? 'Unknown Member' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ optional(optional($r->scheduledClass)->instructor)->name ?? 'Unknown Instructor' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ optional(optional($r->scheduledClass)->classType)->name ?? 'Unknown Class' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ $r->payment_method ?? '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm font-medium text-green-600">
-                                            UGX {{ number_format($r->amount ?? 0, 2) }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">
-                                            {{ optional($r->created_at)->format('Y-m-d') }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="p-6 text-center text-gray-500">No receipts found.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div class="mt-4">
-                        {{ $recentReceipts->links() }}
-                    </div>
                 </div>
-
             </div>
-        </div>
+        </main>
     </div>
 
     <script>

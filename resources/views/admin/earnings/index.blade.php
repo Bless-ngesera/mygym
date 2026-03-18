@@ -204,118 +204,186 @@
         </div>
     </aside>
 
-    {{-- Main Content with proper margin adjustment --}}
+    {{-- Main Content with proper margin adjustment and background image --}}
     <div id="mainContent" class="transition-all duration-300 ease-in-out">
-        <div class="py-6">
-            <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <main class="min-h-screen overflow-y-auto"
+              style="background-image: url('{{ asset('images/background2.jpg') }}');
+                     background-size: cover;
+                     background-position: center;
+                     background-attachment: fixed;">
+            <div class="p-4 md:p-6 lg:p-8">
+                <div class="max-w-6xl mx-auto space-y-6">
 
-                <!-- KPI Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-indigo-500 hover:shadow-md transition">
-                        <div class="text-sm text-gray-500">Total Earnings (All time)</div>
-                        <div class="text-2xl font-bold mt-2">UGX {{ number_format($totalEarnings ?? 0, 2) }}</div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500 hover:shadow-md transition">
-                        <div class="text-sm text-gray-500">This Month</div>
-                        <div class="text-2xl font-bold mt-2">UGX {{ number_format($monthEarnings ?? 0, 2) }}</div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500 hover:shadow-md transition">
-                        <div class="text-sm text-gray-500">Pending Payouts</div>
-                        <div class="text-2xl font-bold mt-2">UGX {{ number_format($pendingPayouts ?? 0, 2) }}</div>
-                    </div>
-                </div>
-
-                <!-- Chart Section -->
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-4">
-                            <h3 class="font-semibold">Monthly Earnings</h3>
-                            <select id="earnings-range"
-                                    class="px-2 py-1 border rounded text-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                <option value="12">Last 12 months</option>
-                                <option value="6">Last 6 months</option>
-                                <option value="3">Last 3 months</option>
-                            </select>
+                    {{-- KPI Cards with Glass-morphism --}}
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">All time</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">UGX {{ number_format($totalEarnings ?? 0, 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">Total Earnings</div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <a href="{{ route('admin.earnings.export.pdf') }}"
-                               class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">
-                               Export PDF
-                            </a>
-                            <a href="{{ route('admin.earnings.export.csv') }}"
-                               class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition">
-                               Export CSV
-                            </a>
-                            <a href="{{ route('admin.earnings.export.excel') }}"
-                               class="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 transition">
-                               Export Excel
+
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{{ now()->format('M Y') }}</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">UGX {{ number_format($monthEarnings ?? 0, 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">This Month</div>
+                        </div>
+
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Pending</span>
+                            </div>
+                            <div class="text-2xl font-bold text-gray-900 tracking-tight">UGX {{ number_format($pendingPayouts ?? 0, 0) }}</div>
+                            <div class="text-xs font-medium text-gray-500 mt-0.5">Pending Payouts</div>
+                        </div>
+                    </div>
+
+                    {{-- Chart Section with Glass-morphism --}}
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-sm">Monthly Earnings</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">Revenue overview by month</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <select id="earnings-range"
+                                        class="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all">
+                                    <option value="12">Last 12 months</option>
+                                    <option value="6">Last 6 months</option>
+                                    <option value="3">Last 3 months</option>
+                                </select>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.earnings.export.pdf') }}"
+                                       class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg inline-flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                        </svg>
+                                        PDF
+                                    </a>
+                                    <a href="{{ route('admin.earnings.export.csv') }}"
+                                       class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg inline-flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        CSV
+                                    </a>
+                                    <a href="{{ route('admin.earnings.export.excel') }}"
+                                       class="px-3 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 transition-all shadow-md hover:shadow-lg inline-flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                        </svg>
+                                        Excel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="relative h-64 w-full">
+                            <canvas id="earningsChart"></canvas>
+                        </div>
+                    </div>
+
+                    {{-- Transactions Table with Glass-morphism --}}
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl p-5 shadow-lg">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-sm">Recent Transactions</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">Latest payment receipts</p>
+                            </div>
+                            <div class="relative w-full sm:w-64">
+                                <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                <input id="tx-search" type="search"
+                                    class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all"
+                                    placeholder="Search receipts, members..." />
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-50/80">
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Reference</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Member</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Instructor</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th class="px-5 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    @forelse($recentTransactions ?? [] as $t)
+                                        <tr class="hover:bg-indigo-50/30 transition-colors duration-150">
+                                            <td class="px-5 py-3.5 text-sm font-mono text-gray-600">
+                                                {{ $t->reference_number ?? '-' }}
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <div class="flex items-center gap-2">
+                                                    <img src="https://ui-avatars.com/api/?name={{ urlencode(optional($t->user)->name ?? 'Member') }}&background=10b981&color=fff&bold=true"
+                                                         alt="" class="w-6 h-6 rounded-lg">
+                                                    <span class="text-sm font-medium text-gray-800">{{ optional($t->user)->name ?? $t->member_name ?? '-' }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3.5 text-sm text-gray-600">
+                                                {{ optional(optional($t->scheduledClass)->instructor)->name ?? 'Unknown Instructor' }}
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-sm font-semibold text-emerald-600">UGX {{ number_format($t->amount ?? 0, 0) }}</span>
+                                            </td>
+                                            <td class="px-5 py-3.5">
+                                                <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                                                    {{ optional($t->created_at)->format('M d, Y') }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="px-5 py-8 text-center">
+                                                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                </div>
+                                                <p class="text-sm text-gray-400 font-medium">No recent transactions</p>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-4 text-right">
+                            <a href="{{ route('admin.earnings.all') }}"
+                               class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                                View All Transactions
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
                             </a>
                         </div>
                     </div>
 
-                    <div class="relative h-64 w-full">
-                        <canvas id="earningsChart"></canvas>
-                    </div>
                 </div>
-
-                <!-- Transactions Table -->
-                <div class="bg-white rounded-lg shadow p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-lg text-gray-800">Recent Transactions</h3>
-                        <input id="tx-search" type="search"
-                            class="px-3 py-2 border rounded text-sm w-64 focus:ring focus:ring-indigo-200 focus:border-indigo-400"
-                            placeholder="Search receipts, members..." />
-                    </div>
-
-                    <div class="overflow-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Reference</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Member</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Instructor</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Amount</th>
-                                    <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tx-tbody" class="divide-y divide-gray-200 bg-white">
-                                @forelse($recentTransactions ?? [] as $t)
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-2 text-sm font-mono text-gray-500">
-                                            {{ $t->reference_number ?? '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ optional($t->user)->name ?? $t->member_name ?? '-' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-900">
-                                            {{ optional(optional($t->scheduledClass)->instructor)->name ?? 'Unknown Instructor' }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm font-medium text-green-600">
-                                            UGX {{ number_format($t->amount ?? 0, 2) }}
-                                        </td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">
-                                            {{ optional($t->created_at)->format('M d, Y') }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="p-6 text-center text-gray-500">No recent transactions.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mt-4 text-right">
-                        <a href="{{ route('admin.earnings.all') }}"
-                           class="text-sm text-indigo-600 hover:text-indigo-800">
-                           View All Transactions →
-                        </a>
-                    </div>
-                </div>
-
             </div>
-        </div>
+        </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -395,11 +463,14 @@
                             datasets: [{
                                 label: 'Earnings (UGX)',
                                 data,
-                                borderColor: '#6366f1',
-                                backgroundColor: 'rgba(99,102,241,0.1)',
-                                borderWidth: 2,
+                                borderColor: '#4f46e5',
+                                backgroundColor: 'rgba(79,70,229,0.1)',
+                                borderWidth: 2.5,
                                 fill: true,
-                                tension: 0.4
+                                tension: 0.4,
+                                pointBackgroundColor: '#4f46e5',
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
                             }]
                         },
                         options: {
@@ -408,11 +479,12 @@
                             plugins: {
                                 legend: { display: false },
                                 tooltip: {
+                                    backgroundColor: 'rgba(17,24,39,0.9)',
+                                    cornerRadius: 8,
+                                    padding: 10,
                                     callbacks: {
                                         label: function(context) {
-                                            return 'Earnings: ' + new Intl.NumberFormat(
-                                                'en-UG', { style: 'currency', currency: 'UGX' }
-                                            ).format(context.parsed.y);
+                                            return 'Earnings: UGX ' + Number(context.parsed.y).toLocaleString();
                                         }
                                     }
                                 }
@@ -420,12 +492,12 @@
                             scales: {
                                 y: {
                                     beginAtZero: true,
+                                    grid: { color: 'rgba(0,0,0,0.04)' },
                                     ticks: {
                                         callback: function(value) {
                                             return 'UGX ' + Number(value).toLocaleString();
                                         }
-                                    },
-                                    grid: { borderDash: [2,4] }
+                                    }
                                 },
                                 x: { grid: { display: false } }
                             }
@@ -464,5 +536,8 @@
         #adminSidebar { will-change: transform; }
         #sidebarOverlay { transition: opacity 0.3s ease; }
         #mainContent { transition: margin-left 0.3s cubic-bezier(0.4,0,0.2,1); }
+
+        /* Fix for table tbody id */
+        #tx-tbody tr { transition: background-color 0.2s ease; }
     </style>
 </x-app-layout>

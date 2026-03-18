@@ -126,7 +126,7 @@
                 </span>
                 <span class="text-sm font-semibold">Instructors</span>
                 @if($instructors->total() > 0)
-                    <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-white/25 text-white">
+                    <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full {{ request()->routeIs('admin.instructors.*') ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-700' }}">
                         {{ $instructors->total() }}
                     </span>
                 @endif
@@ -216,103 +216,138 @@
         </div>
     </aside>
 
-    {{-- Main Content with proper margin adjustment --}}
+    {{-- Main Content with proper margin adjustment and background image --}}
     <div id="mainContent" class="transition-all duration-300 ease-in-out">
-        <div class="py-6">
-            <div class="max-w-6xl mx-auto sm:px-6 lg:px-8">
-                <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div class="relative w-full sm:w-1/3">
-                        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        <input id="instructor-search" type="search" placeholder="Search instructors by name, email, or specialty..."
-                               class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all" />
-                    </div>
-                    <div class="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">
-                        Total: <span class="font-bold">{{ $instructors->total() ?? 0 }}</span> instructors
-                    </div>
-                </div>
+        <main class="min-h-screen overflow-y-auto"
+              style="background-image: url('{{ asset('images/background2.jpg') }}');
+                     background-size: cover;
+                     background-position: center;
+                     background-attachment: fixed;">
+            <div class="p-4 md:p-6 lg:p-8">
+                <div class="max-w-6xl mx-auto">
 
-                <div class="grid gap-3">
-                    @forelse($instructors as $ins)
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/90 backdrop-blur-sm border border-white/20 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200">
-                            <div class="flex items-center gap-4 w-full sm:w-auto mb-3 sm:mb-0">
-                                <!-- Avatar + Name block -->
-                                <img src="{{ $ins->photo_url ?? 'https://ui-avatars.com/api/?name='.urlencode($ins->name).'&background=4F46E5&color=fff&bold=true&size=128' }}"
-                                    class="w-14 h-14 rounded-xl object-cover ring-2 ring-indigo-200 shadow-md" alt="Instructor photo">
-
-                                <div>
-                                    <div class="font-semibold text-gray-900 text-lg">{{ $ins->name }}</div>
-                                    <div class="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                                        <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{{ $ins->specialty ?? 'General' }}</span>
-                                    </div>
-                                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                        </svg>
-                                        Joined {{ $ins->created_at->format('M d, Y') }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col items-start sm:items-end w-full sm:w-auto">
-                                <div class="text-sm text-gray-600 flex items-center gap-1 mb-2">
-                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                    </svg>
-                                    {{ $ins->email }}
-                                </div>
-                                <div class="mt-2 flex gap-2">
-                                    <a href="{{ route('admin.instructors.edit', $ins->id) }}"
-                                       class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-semibold hover:bg-amber-100 transition-all duration-200 flex items-center gap-1 border border-amber-200">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                        </svg>
-                                        Edit
-                                    </a>
-
-                                    <form action="{{ route('admin.instructors.destroy', $ins->id) }}"
-                                        method="POST"
-                                        onsubmit="return confirm('Are you sure you want to delete this instructor?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit"
-                                                class="px-3 py-1.5 bg-red-50 text-red-700 rounded-xl text-xs font-semibold hover:bg-red-100 transition-all duration-200 flex items-center gap-1 border border-red-200">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                            </svg>
-                                            Delete
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
+                    {{-- Header Section with Title and Actions --}}
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Instructors</h1>
+                            <p class="text-sm text-gray-500 mt-1">Manage your fitness instructors</p>
                         </div>
-                    @empty
-                        <div class="p-8 text-center bg-white/90 backdrop-blur-sm border border-white/20 rounded-2xl shadow-lg">
-                            <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
+                                <input id="instructor-search" type="search"
+                                       placeholder="Search instructors..."
+                                       class="pl-10 pr-4 py-2 bg-white/80 border border-gray-200 rounded-xl text-sm w-64 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all" />
                             </div>
-                            <p class="text-gray-500 font-medium">No instructors found.</p>
-                            <a href="{{ route('admin.instructors.create') }}" class="inline-flex items-center gap-2 mt-3 text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                            <a href="{{ route('admin.instructors.create') }}"
+                               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                                 </svg>
-                                Register your first instructor
+                                Add Instructor
                             </a>
                         </div>
-                    @endforelse
-                </div>
-
-                <!-- Pagination -->
-                @if($instructors->hasPages())
-                    <div class="mt-6">
-                        {{ $instructors->links() }}
                     </div>
-                @endif
+
+                    {{-- Instructors Table --}}
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden">
+                        {{-- Table Header --}}
+                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-sm">Recent Instructors</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">Latest registered instructors</p>
+                            </div>
+                            <div class="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">
+                                Total: <span class="font-bold">{{ $instructors->total() ?? 0 }}</span>
+                            </div>
+                        </div>
+
+                        {{-- Table --}}
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-50/80 border-b border-gray-100">
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    @forelse($instructors as $ins)
+                                        <tr class="hover:bg-indigo-50/30 transition-colors duration-150">
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center gap-3">
+                                                    <img src="{{ $ins->photo_url ?? 'https://ui-avatars.com/api/?name='.urlencode($ins->name).'&background=4F46E5&color=fff&bold=true' }}"
+                                                         alt="" class="w-8 h-8 rounded-lg ring-2 ring-indigo-200">
+                                                    <div>
+                                                        <div class="text-sm font-semibold text-gray-800">{{ $ins->name }}</div>
+                                                        @if($ins->specialty)
+                                                            <span class="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{{ $ins->specialty }}</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">{{ $ins->email }}</td>
+                                            <td class="px-6 py-4">
+                                                <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
+                                                    {{ $ins->created_at->format('M d, Y') }}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center gap-2">
+                                                    <a href="{{ route('admin.instructors.edit', $ins->id) }}"
+                                                       class="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                        Edit
+                                                    </a>
+                                                    <form action="{{ route('admin.instructors.destroy', $ins->id) }}"
+                                                          method="POST"
+                                                          onsubmit="return confirm('Are you sure you want to delete this instructor?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit"
+                                                                class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                            Delete
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="px-6 py-12 text-center">
+                                                <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                                    </svg>
+                                                </div>
+                                                <p class="text-sm text-gray-400 font-medium">No instructors found.</p>
+                                                <a href="{{ route('admin.instructors.create') }}" class="inline-flex items-center gap-2 mt-3 text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                    </svg>
+                                                    Register your first instructor
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Pagination --}}
+                        @if($instructors->hasPages())
+                            <div class="px-6 py-4 border-t border-gray-100">
+                                {{ $instructors->links() }}
+                            </div>
+                        @endif
+                    </div>
+
+                </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>
@@ -373,9 +408,9 @@
             // ==================== SEARCH FUNCTIONALITY ====================
             document.getElementById('instructor-search')?.addEventListener('input', function(){
                 const q = this.value.toLowerCase();
-                document.querySelectorAll('.grid > div').forEach(card => {
-                    const txt = card.innerText.toLowerCase();
-                    card.style.display = txt.includes(q) ? '' : 'none';
+                document.querySelectorAll('tbody tr').forEach(row => {
+                    const txt = row.innerText.toLowerCase();
+                    row.style.display = txt.includes(q) ? '' : 'none';
                 });
             });
         });
