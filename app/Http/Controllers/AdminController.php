@@ -29,7 +29,10 @@ class AdminController extends Controller
     {
         $totalBookings   = Booking::count();
         $totalRevenue    = Receipt::sum('amount');
-        $recentBookings  = Booking::latest()->take(5)->get();
+        $recentBookings  = Booking::with(['user', 'scheduledClass.classType'])
+            ->latest()
+            ->take(5)
+            ->get();
 
         // Recent members
         $recentMembers = User::where('role', 'member')
@@ -37,20 +40,27 @@ class AdminController extends Controller
             ->take(5)
             ->get();
 
-
         // Recent instructors
         $recentInstructors = User::where('role', 'instructor')
             ->orderByDesc('created_at')
             ->take(5)
             ->get();
 
-        return view('admin.dashboard', [
-            'totalBookings'    => $totalBookings,
-            'totalRevenue'     => $totalRevenue,
-            'recentBookings'   => $recentBookings,
-            'recentMembers'    => $recentMembers,
-            'recentInstructors'=> $recentInstructors,
-        ]);
+        // Stats cards
+        $totalMembers = User::where('role', 'member')->count();
+        $totalInstructors = User::where('role', 'instructor')->count();
+        $totalClasses = \App\Models\ScheduledClass::count();
+
+        return view('admin.dashboard', compact(
+            'totalBookings',
+            'totalRevenue',
+            'recentBookings',
+            'recentMembers',
+            'recentInstructors',
+            'totalMembers',
+            'totalInstructors',
+            'totalClasses'
+        ));
     }
 
     /**
@@ -64,9 +74,12 @@ class AdminController extends Controller
             ->whereYear('created_at', now()->year)
             ->sum('amount');
 
-        $pendingPayouts = 0;
+        $pendingPayouts = 0; // You can calculate this based on your business logic
 
-        $recentTransactions = Receipt::with('user')->latest()->take(10)->get();
+        $recentTransactions = Receipt::with('user')
+            ->latest()
+            ->take(10)
+            ->get();
 
         $monthlyStats = Receipt::select(
                 DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month_key'),
@@ -78,12 +91,12 @@ class AdminController extends Controller
             ->orderBy('month_key', 'ASC')
             ->get();
 
-        $monthlyLabels   = $monthlyStats->pluck('month_label')->toArray();
+        $monthlyLabels = $monthlyStats->pluck('month_label')->toArray();
         $monthlyEarnings = $monthlyStats->pluck('total')->toArray();
 
         if (empty($monthlyLabels)) {
-            $monthlyLabels   = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
-            $monthlyEarnings = [0, 0, 0, 0, 0];
+            $monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            $monthlyEarnings = array_fill(0, 12, 0);
         }
 
         return view('admin.earnings', compact(
@@ -102,7 +115,7 @@ class AdminController extends Controller
     public function earningsData(Request $request)
     {
         $months = (int) $request->get('range', 12);
-        $months = $months > 0 ? $months : 12;
+        $months = max(1, min(24, $months)); // Limit between 1-24 months
 
         $earnings = Receipt::selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month_key, SUM(amount) as total')
             ->where('created_at', '>=', Carbon::now()->subMonths($months))
@@ -118,13 +131,13 @@ class AdminController extends Controller
      */
     public function exportPdf()
     {
-        $receipts = Receipt::with(['user', 'scheduledClass.classType'])->latest()->get();
+        $receipts = Receipt::with(['user', 'scheduledClass.classType'])
+            ->latest()
+            ->get();
 
-        $pdf = Pdf::loadView('admin.exports.pdf', [
-            'receipts' => $receipts
-        ]);
+        $pdf = Pdf::loadView('admin.exports.pdf', compact('receipts'));
 
-        return $pdf->download('receipts-report.pdf');
+        return $pdf->download('receipts-report-' . now()->format('Y-m-d') . '.pdf');
     }
 
     /**
@@ -132,9 +145,12 @@ class AdminController extends Controller
      */
     public function exportCsv()
     {
-        $receipts = Receipt::with(['user', 'scheduledClass.classType'])->latest()->get();
+        $receipts = Receipt::with(['user', 'scheduledClass.classType'])
+            ->latest()
+            ->get();
 
-        $csv = Writer::createFromString('');
+        // Create CSV using League\Csv\Writer (fixed deprecated method)
+        $csv = Writer::createFromString();
         $csv->insertOne(['ID', 'User', 'Class', 'Payment Method', 'Amount', 'Reference', 'Date']);
 
         foreach ($receipts as $receipt) {
@@ -143,20 +159,120 @@ class AdminController extends Controller
                 optional($receipt->user)->name ?? 'N/A',
                 optional(optional($receipt->scheduledClass)->classType)->name ?? 'N/A',
                 $receipt->payment_method,
-                $receipt->amount,
-                $receipt->reference_number ?? '',
+                number_format($receipt->amount, 2),
+                $receipt->reference_number ?? 'N/A',
                 $receipt->created_at->format('Y-m-d'),
             ]);
         }
 
-        $filename = 'receipts-report.csv';
+        $filename = 'receipts-report-' . now()->format('Y-m-d') . '.csv';
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv->toString();
         }, $filename, [
-            'Content-Type'        => 'text/csv',
+            'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename={$filename}",
         ]);
+    }
+
+    /**
+     * Member CRUD
+     */
+    public function members()
+    {
+        $members = User::where('role', 'member')
+            ->orderByDesc('created_at')
+            ->paginate(15);
+
+        return view('admin.members.index', compact('members'));
+    }
+
+    public function createMember()
+    {
+        return view('admin.members.create');
+    }
+
+    public function storeMember(Request $request)
+    {
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+        ]);
+
+        try {
+            User::create([
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role'     => 'member',
+            ]);
+
+            return redirect()->route('admin.members.index')
+                ->with('success', 'Member created successfully.');
+        } catch (\Throwable $e) {
+            return back()
+                ->withErrors(['error' => 'Unable to create member: ' . $e->getMessage()])
+                ->withInput();
+        }
+    }
+
+    public function editMember($id)
+    {
+        $member = User::where('role', 'member')->findOrFail($id);
+        return view('admin.members.edit', compact('member'));
+    }
+
+    public function updateMember(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email,' . $id,
+            'password' => 'nullable|string|min:8',
+        ]);
+
+        try {
+            $member = User::where('role', 'member')->findOrFail($id);
+
+            $updateData = [
+                'name'  => $validated['name'],
+                'email' => $validated['email'],
+            ];
+
+            if (!empty($validated['password'])) {
+                $updateData['password'] = Hash::make($validated['password']);
+            }
+
+            $member->update($updateData);
+
+            return redirect()->route('admin.members.index')
+                ->with('success', 'Member updated successfully.');
+        } catch (\Throwable $e) {
+            return back()
+                ->withErrors(['error' => 'Unable to update member: ' . $e->getMessage()])
+                ->withInput();
+        }
+    }
+
+    public function destroyMember($id)
+    {
+        try {
+            $member = User::where('role', 'member')->findOrFail($id);
+
+            // Check if member has bookings before deleting
+            if ($member->bookings()->exists()) {
+                return redirect()->route('admin.members.index')
+                    ->withErrors(['error' => 'Cannot delete member with existing bookings.']);
+            }
+
+            $member->delete();
+
+            return redirect()->route('admin.members.index')
+                ->with('success', 'Member deleted successfully.');
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.members.index')
+                ->withErrors(['error' => 'Unable to delete member: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -184,18 +300,26 @@ class AdminController extends Controller
         ]);
 
         try {
-            $user = new User();
-            $user->name     = $validated['name'];
-            $user->email    = $validated['email'];
-            $user->password = Hash::make(Str::random(12));
-            $user->role     = 'instructor';
-            $user->save();
+            $password = Str::random(12);
+
+            $user = User::create([
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => Hash::make($password),
+                'role'     => 'instructor',
+            ]);
+
+            // Store password to include in email
+            $user->plain_password = $password;
 
             Mail::to($user->email)->send(new InstructorRegisteredMail($user));
 
-            return back()->with('success', 'Instructor registered successfully and email sent.');
+            return redirect()->route('admin.instructors.index')
+                ->with('success', 'Instructor registered successfully. Password has been sent to their email.');
         } catch (\Throwable $e) {
-            return back()->withErrors(['msg' => 'Unable to register instructor.'])->withInput();
+            return back()
+                ->withErrors(['error' => 'Unable to register instructor: ' . $e->getMessage()])
+                ->withInput();
         }
     }
 
@@ -206,45 +330,54 @@ class AdminController extends Controller
     }
 
     public function updateInstructor(Request $request, $id)
-{
-    $validated = $request->validate([
-        'name'  => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email,' . $id,
-    ]);
+    {
+        $validated = $request->validate([
+            'name'  => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $id,
+        ]);
 
-    $instructor = User::where('role', 'instructor')->findOrFail($id);
-    $instructor->update($validated);
+        try {
+            $instructor = User::where('role', 'instructor')->findOrFail($id);
+            $instructor->update($validated);
 
-    return redirect()->route('admin.dashboard')
-        ->with('success', 'Instructor updated successfully.');
-}
-
-public function destroyInstructor($id)
-{
-    try {
-        $instructor = User::where('role', 'instructor')->findOrFail($id);
-        $instructor->delete();
-
-        return redirect()->route('admin.dashboard')
-            ->with('success', 'Instructor deleted successfully.');
-    } catch (\Throwable $e) {
-        return redirect()->route('admin.dashboard')
-            ->withErrors(['msg' => 'Unable to delete instructor.']);
+            return redirect()->route('admin.instructors.index')
+                ->with('success', 'Instructor updated successfully.');
+        } catch (\Throwable $e) {
+            return back()
+                ->withErrors(['error' => 'Unable to update instructor: ' . $e->getMessage()])
+                ->withInput();
+        }
     }
-}
 
-public function downloadInstructorPdf()
-{
-    $instructors = User::where('role', 'instructor')
-        ->orderByDesc('created_at')
-        ->get();
+    public function destroyInstructor($id)
+    {
+        try {
+            $instructor = User::where('role', 'instructor')->findOrFail($id);
 
-    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.instructors-pdf', [
-        'instructors' => $instructors
-    ]);
+            // Check if instructor has classes before deleting
+            if ($instructor->scheduledClasses()->exists()) {
+                return redirect()->route('admin.instructors.index')
+                    ->withErrors(['error' => 'Cannot delete instructor with existing classes.']);
+            }
 
-    return $pdf->download('instructors-report.pdf');
-}
+            $instructor->delete();
 
+            return redirect()->route('admin.instructors.index')
+                ->with('success', 'Instructor deleted successfully.');
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.instructors.index')
+                ->withErrors(['error' => 'Unable to delete instructor: ' . $e->getMessage()]);
+        }
+    }
 
+    public function downloadInstructorPdf()
+    {
+        $instructors = User::where('role', 'instructor')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $pdf = Pdf::loadView('admin.reports.instructors-pdf', compact('instructors'));
+
+        return $pdf->download('instructors-report-' . now()->format('Y-m-d') . '.pdf');
+    }
 }

@@ -7,7 +7,7 @@
                 <p class="text-sm text-gray-500 mt-1">Full receipts list with pagination</p>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('admin.earnings') }}"
+                <a href="{{ route('admin.earnings.index') }}"
                    class="px-3 py-2 text-sm bg-white rounded shadow hover:bg-gray-50 transition">
                    ← Back to Earnings
                 </a>

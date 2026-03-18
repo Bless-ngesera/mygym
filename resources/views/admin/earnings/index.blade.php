@@ -46,15 +46,15 @@
                         </select>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('earnings.pdf') }}"
+                        <a href="{{ route('admin.earnings.export.pdf') }}"
                            class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">
                            Export PDF
                         </a>
-                        <a href="{{ route('earnings.csv') }}"
+                        <a href="{{ route('admin.earnings.export.csv') }}"
                            class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition">
                            Export CSV
                         </a>
-                        <a href="{{ route('earnings.excel') }}"
+                        <a href="{{ route('admin.earnings.export.excel') }}"
                            class="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 transition">
                            Export Excel
                         </a>

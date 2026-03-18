@@ -9,6 +9,7 @@ use App\Http\Controllers\EarningsController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ScheduledClassController;
 use App\Http\Controllers\ReceiptController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,11 +44,30 @@ Route::middleware('auth')->group(function () {
 
     // Receipts
     Route::prefix('receipts')->name('receipts.')->group(function () {
+        Route::get('/', [ReceiptController::class, 'index'])->name('index');
         Route::post('/', [ReceiptController::class, 'store'])->name('store');
         Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
     });
 
-    // Admin routes - using your CheckUserRole middleware with 'admin' parameter
+    // Member dashboard
+    Route::get('/member/dashboard', function () {
+        return view('member.dashboard');
+    })->name('member.dashboard');
+
+    // Profile routes
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // ==================== USER SETTINGS ====================
+    // User settings - accessible to all authenticated users
+    Route::prefix('settings')->name('user.settings.')->group(function () {
+        Route::get('/', [SettingsController::class, 'userIndex'])->name('index');
+        Route::post('/', [SettingsController::class, 'userUpdate'])->name('update');
+    });
+
+    // ==================== ADMIN ROUTES ====================
+    // Admin routes - using CheckUserRole middleware with 'admin' parameter
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
 
         // Admin Dashboard
@@ -55,6 +75,16 @@ Route::middleware('auth')->group(function () {
 
         // Admin main dashboard (legacy)
         Route::get('/', [AdminController::class, 'dashboard'])->name('index');
+
+        // Members Management
+        Route::prefix('members')->name('members.')->group(function () {
+            Route::get('/', [AdminController::class, 'members'])->name('index');
+            Route::get('/create', [AdminController::class, 'createMember'])->name('create');
+            Route::post('/', [AdminController::class, 'storeMember'])->name('store');
+            Route::get('/{id}/edit', [AdminController::class, 'editMember'])->name('edit');
+            Route::put('/{id}', [AdminController::class, 'updateMember'])->name('update');
+            Route::delete('/{id}', [AdminController::class, 'destroyMember'])->name('destroy');
+        });
 
         // Earnings
         Route::prefix('earnings')->name('earnings.')->group(function () {
@@ -87,39 +117,27 @@ Route::middleware('auth')->group(function () {
             Route::get('/download-excel', [ReportsController::class, 'downloadExcel'])->name('download.excel');
             Route::get('/download-instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
         });
+
+        // Admin Settings
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::get('/', [SettingsController::class, 'index'])->name('index');
+            Route::post('/', [SettingsController::class, 'update'])->name('update');
+            Route::post('/logo', [SettingsController::class, 'updateLogo'])->name('logo');
+            Route::post('/favicon', [SettingsController::class, 'updateFavicon'])->name('favicon');
+            Route::post('/reset', [SettingsController::class, 'reset'])->name('reset');
+            Route::post('/clear-cache', [SettingsController::class, 'clearCache'])->name('clear-cache');
+        });
     });
 
-    // Instructor routes - using your CheckUserRole middleware with 'instructor' parameter
+    // ==================== INSTRUCTOR ROUTES ====================
+    // Instructor routes - using CheckUserRole middleware with 'instructor' parameter
     Route::prefix('instructor')->name('instructor.')->middleware('role:instructor')->group(function () {
-        // Add instructor-specific routes here
         Route::get('/dashboard', function () {
             return view('instructor.dashboard');
         })->name('dashboard');
 
         Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
         Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
-    });
-
-    // Profile routes
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    // Member dashboard
-    Route::get('/member/dashboard', function () {
-        return view('member.dashboard'); // Make sure this view exists
-    })->name('member.dashboard');
-
-    // Receipts - Add this inside the authenticated routes group
-    Route::prefix('receipts')->name('receipts.')->group(function () {
-        // For listing receipts - you'll need to add this method to controller later
-        // Route::get('/', [ReceiptController::class, 'index'])->name('index');
-
-        // Store receipt (from payment)
-        Route::post('/', [ReceiptController::class, 'store'])->name('store');
-
-        // Show individual receipt
-        Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
     });
 });
 

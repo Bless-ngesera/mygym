@@ -52,7 +52,7 @@
 
         el.innerHTML = `<div class="text-sm text-gray-600">Loading ${type} report...</div>`;
 
-        fetch("{{ route('reports.generate') }}", {
+        fetch("{{ route('admin.reports.generate') }}", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -179,7 +179,7 @@
         const type = document.getElementById('report-type').value;
         const from = document.getElementById('report-from').value;
         const to   = document.getElementById('report-to').value;
-        const url  = new URL("{{ route('reports.pdf') }}", window.location.origin);
+        const url  = new URL("{{ route('admin.reports.download.pdf') }}", window.location.origin);
         url.searchParams.set('type', type);
         if (from) url.searchParams.set('from', from);
         if (to)   url.searchParams.set('to', to);
@@ -190,7 +190,7 @@
         const type = document.getElementById('report-type').value;
         const from = document.getElementById('report-from').value;
         const to   = document.getElementById('report-to').value;
-        const url  = new URL("{{ route('reports.excel') }}", window.location.origin);
+        const url  = new URL("{{ route('admin.reports.download.excel') }}", window.location.origin);
         url.searchParams.set('type', type);
         if (from) url.searchParams.set('from', from);
         if (to)   url.searchParams.set('to', to);
