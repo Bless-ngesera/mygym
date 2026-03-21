@@ -11,9 +11,9 @@
     </x-slot>
 
     <div class="py-12 bg-gray-50 min-h-screen relative"
-        style="background-image: url('{{ asset('images/background2.jpg') }}'); 
-               background-size: cover; 
-               background-position: center; 
+        style="background-image: url('{{ asset('images/background2.jpg') }}');
+               background-size: cover;
+               background-position: center;
                background-attachment: fixed;">
         <div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-white/70 pointer-events-none"></div>
 

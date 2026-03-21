@@ -11,6 +11,8 @@ use App\Http\Controllers\ScheduledClassController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,10 +39,23 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', [BookingController::class, 'destroy'])->name('destroy');
     });
 
-    // Scheduled Classes (Full Resource Controller)
-    Route::resource('classes', ScheduledClassController::class)->parameters([
-        'classes' => 'scheduledClass'
-    ]);
+    // ==================== SCHEDULE / CLASSES ROUTES ====================
+    // Resource controller for schedule (instructors only)
+    Route::resource('schedule', ScheduledClassController::class)
+        ->parameters(['schedule' => 'scheduledClass'])
+        ->middleware(['role:instructor']);
+
+    // Additional schedule routes
+    Route::prefix('schedule')->name('schedule.')->middleware(['role:instructor'])->group(function () {
+        Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
+        Route::get('/all', [ScheduledClassController::class, 'instructorClasses'])->name('all');
+    });
+
+    // Classes routes (for members to view/booking)
+    Route::prefix('classes')->name('classes.')->group(function () {
+        Route::get('/', [ScheduledClassController::class, 'upcoming'])->name('index');
+        Route::post('/{scheduledClass}/book', [ScheduledClassController::class, 'book'])->name('book');
+    });
 
     // Receipts
     Route::prefix('receipts')->name('receipts.')->group(function () {
@@ -53,6 +68,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/member/dashboard', function () {
         return view('member.dashboard');
     })->name('member.dashboard');
+
+    // Member bookings
+    Route::get('/member/bookings', function () {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $filter = request('filter', 'upcoming');
+
+        $query = $user->bookings()->with(['classType', 'instructor']);
+
+        if ($filter === 'upcoming') {
+            $query->where('date_time', '>', Carbon::now());
+        } elseif ($filter === 'past') {
+            $query->where('date_time', '<', Carbon::now());
+        }
+
+        $bookings = $query->orderBy('date_time', 'desc')->paginate(12);
+
+        return view('member.bookings', compact('bookings'));
+    })->name('member.bookings');
 
     // Profile routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -136,6 +171,8 @@ Route::middleware('auth')->group(function () {
             return view('instructor.dashboard');
         })->name('dashboard');
 
+        Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
+        Route::get('/classes/create', [ScheduledClassController::class, 'create'])->name('create');
         Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
         Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
     });

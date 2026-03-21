@@ -21,9 +21,9 @@
                                 Dashboard
                             </x-nav-link>
                         @else
-                            <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                            {{-- <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                                 Dashboard
-                            </x-nav-link>
+                            </x-nav-link> --}}
                         @endif
 
                         <!-- Role-Based Navigation Links -->
@@ -43,11 +43,15 @@
 
                         @if(auth()->user()->role === 'instructor')
                             <x-nav-link :href="route('instructor.dashboard')" :active="request()->routeIs('instructor.dashboard')">
-                                Instructor Dashboard
+                                Dashboard
                             </x-nav-link>
 
-                            <x-nav-link :href="route('instructor.classes')" :active="request()->routeIs('instructor.classes')">
-                                My Classes
+                            <x-nav-link :href="route('instructor.create')" :active="request()->routeIs('instructor.create')">
+                                Schedule a Class
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('instructor.upcoming')" :active="request()->routeIs('instructor.upcoming')">
+                                Upcoming Classes
                             </x-nav-link>
 
                             <x-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">
@@ -141,6 +145,21 @@
                                 </svg>
                                 Instructor Panel
                             </x-dropdown-link>
+
+                            <x-dropdown-link :href="route('instructor.create')" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Schedule Class
+                            </x-dropdown-link>
+
+                            <x-dropdown-link :href="route('instructor.upcoming')" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Upcoming Classes
+                            </x-dropdown-link>
+
                         @endif
 
                         <x-dropdown-link :href="route('profile.edit')" class="flex items-center gap-2">
@@ -226,11 +245,15 @@
 
                 @if(auth()->user()->role === 'instructor')
                     <x-responsive-nav-link :href="route('instructor.dashboard')" :active="request()->routeIs('instructor.dashboard')">
-                        Instructor Dashboard
+                        Dashboard
                     </x-responsive-nav-link>
 
-                    <x-responsive-nav-link :href="route('instructor.classes')" :active="request()->routeIs('instructor.classes')">
-                        My Classes
+                    <x-responsive-nav-link :href="route('instructor.upcoming')" :active="request()->routeIs('instructor.upcoming')">
+                        Upcoming Classes
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('instructor.create')" :active="request()->routeIs('instructor.create')">
+                        Schedule a Class
                     </x-responsive-nav-link>
 
                     <x-responsive-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">

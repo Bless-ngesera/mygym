@@ -2,18 +2,12 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-               Schedule a class
+                Edit Class
             </h2>
-            <div class="flex gap-3">
-                <a href="{{ route('instructor.upcoming') }}"
-                   class="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-200 transition-all duration-200">
-                    View Upcoming Classes
-                </a>
-                <a href="{{ route('instructor.classes') }}"
-                   class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-200 transition-all duration-200">
-                    My Classes
-                </a>
-            </div>
+            <a href="{{ route('instructor.upcoming') }}"
+               class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all duration-200">
+                ← Back to Upcoming Classes
+            </a>
         </div>
     </x-slot>
 
@@ -61,17 +55,18 @@
 
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden">
                 <div class="p-6 md:p-8">
-                    <form action="{{ route('schedule.store') }}" method="post" class="max-w-md mx-auto">
+                    <form action="{{ route('schedule.update', $scheduledClass->id) }}" method="POST" class="max-w-md mx-auto">
                         @csrf
+                        @method('PUT')
                         <div class="space-y-5">
                             <!-- Class Type Selection -->
                             <div>
-                                <label class="text-sm font-semibold text-gray-700 block mb-2 uppercase tracking-wide">Select type of class</label>
+                                <label class="text-sm font-semibold text-gray-700 block mb-2 uppercase tracking-wide">Class Type</label>
                                 <select name="class_type_id"
                                         class="w-full px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all @error('class_type_id') border-red-500 @enderror">
                                     <option value="">-- Select Class Type --</option>
-                                    @foreach ($classTypes as $classType)
-                                    <option value="{{ $classType->id }}" {{ old('class_type_id') == $classType->id ? 'selected' : '' }}>{{ $classType->name }}</option>
+                                    @foreach($classTypes as $type)
+                                        <option value="{{ $type->id }}" {{ old('class_type_id', $scheduledClass->class_type_id) == $type->id ? 'selected' : '' }}>{{ $type->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('class_type_id')
@@ -85,7 +80,7 @@
                                     <label class="text-sm font-semibold text-gray-700 block mb-2 uppercase tracking-wide">Date</label>
                                     <input type="date"
                                            name="date"
-                                           value="{{ old('date') }}"
+                                           value="{{ old('date', $date) }}"
                                            class="w-full px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all @error('date') border-red-500 @enderror"
                                            min="{{ date('Y-m-d', strtotime('tomorrow')) }}">
                                     @error('date')
@@ -99,22 +94,22 @@
                                     <select name="time"
                                             class="w-full px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all @error('time') border-red-500 @enderror">
                                         <option value="">Select Time</option>
-                                        <option value="05:00" {{ old('time') == '05:00' ? 'selected' : '' }}>5:00 AM</option>
-                                        <option value="06:00" {{ old('time') == '06:00' ? 'selected' : '' }}>6:00 AM</option>
-                                        <option value="07:00" {{ old('time') == '07:00' ? 'selected' : '' }}>7:00 AM</option>
-                                        <option value="08:00" {{ old('time') == '08:00' ? 'selected' : '' }}>8:00 AM</option>
-                                        <option value="09:00" {{ old('time') == '09:00' ? 'selected' : '' }}>9:00 AM</option>
-                                        <option value="10:00" {{ old('time') == '10:00' ? 'selected' : '' }}>10:00 AM</option>
-                                        <option value="11:00" {{ old('time') == '11:00' ? 'selected' : '' }}>11:00 AM</option>
-                                        <option value="12:00" {{ old('time') == '12:00' ? 'selected' : '' }}>12:00 PM</option>
-                                        <option value="13:00" {{ old('time') == '13:00' ? 'selected' : '' }}>1:00 PM</option>
-                                        <option value="14:00" {{ old('time') == '14:00' ? 'selected' : '' }}>2:00 PM</option>
-                                        <option value="15:00" {{ old('time') == '15:00' ? 'selected' : '' }}>3:00 PM</option>
-                                        <option value="16:00" {{ old('time') == '16:00' ? 'selected' : '' }}>4:00 PM</option>
-                                        <option value="17:00" {{ old('time') == '17:00' ? 'selected' : '' }}>5:00 PM</option>
-                                        <option value="18:00" {{ old('time') == '18:00' ? 'selected' : '' }}>6:00 PM</option>
-                                        <option value="19:00" {{ old('time') == '19:00' ? 'selected' : '' }}>7:00 PM</option>
-                                        <option value="20:00" {{ old('time') == '20:00' ? 'selected' : '' }}>8:00 PM</option>
+                                        <option value="05:00" {{ old('time', $time) == '05:00' ? 'selected' : '' }}>5:00 AM</option>
+                                        <option value="06:00" {{ old('time', $time) == '06:00' ? 'selected' : '' }}>6:00 AM</option>
+                                        <option value="07:00" {{ old('time', $time) == '07:00' ? 'selected' : '' }}>7:00 AM</option>
+                                        <option value="08:00" {{ old('time', $time) == '08:00' ? 'selected' : '' }}>8:00 AM</option>
+                                        <option value="09:00" {{ old('time', $time) == '09:00' ? 'selected' : '' }}>9:00 AM</option>
+                                        <option value="10:00" {{ old('time', $time) == '10:00' ? 'selected' : '' }}>10:00 AM</option>
+                                        <option value="11:00" {{ old('time', $time) == '11:00' ? 'selected' : '' }}>11:00 AM</option>
+                                        <option value="12:00" {{ old('time', $time) == '12:00' ? 'selected' : '' }}>12:00 PM</option>
+                                        <option value="13:00" {{ old('time', $time) == '13:00' ? 'selected' : '' }}>1:00 PM</option>
+                                        <option value="14:00" {{ old('time', $time) == '14:00' ? 'selected' : '' }}>2:00 PM</option>
+                                        <option value="15:00" {{ old('time', $time) == '15:00' ? 'selected' : '' }}>3:00 PM</option>
+                                        <option value="16:00" {{ old('time', $time) == '16:00' ? 'selected' : '' }}>4:00 PM</option>
+                                        <option value="17:00" {{ old('time', $time) == '17:00' ? 'selected' : '' }}>5:00 PM</option>
+                                        <option value="18:00" {{ old('time', $time) == '18:00' ? 'selected' : '' }}>6:00 PM</option>
+                                        <option value="19:00" {{ old('time', $time) == '19:00' ? 'selected' : '' }}>7:00 PM</option>
+                                        <option value="20:00" {{ old('time', $time) == '20:00' ? 'selected' : '' }}>8:00 PM</option>
                                     </select>
                                     @error('time')
                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -122,15 +117,15 @@
                                 </div>
                             </div>
 
-                            <!-- Schedule Button -->
+                            <!-- Update Button -->
                             <div class="pt-4">
                                 <button type="submit"
                                         class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">
                                     <span class="flex items-center justify-center">
                                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                         </svg>
-                                        Schedule Class
+                                        Update Class
                                     </span>
                                 </button>
                             </div>
@@ -180,13 +175,5 @@
                 }, 500);
             }
         }, 5000);
-
-        // Clear old input values after successful submission (optional)
-        @if(session('success'))
-            // Reset form fields after successful submission
-            setTimeout(function() {
-                document.querySelector('form').reset();
-            }, 100);
-        @endif
     </script>
 </x-app-layout>

@@ -3,13 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Receipt;
+use App\Models\User;
 use App\Exports\InstructorPayoutExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class EarningsController extends Controller
 {
+    /**
+     * Display earnings for admin.
+     */
     public function index(Request $request)
     {
         $query = Receipt::with(['user', 'scheduledClass.classType', 'scheduledClass.instructor']); // eager load relations
@@ -40,6 +46,70 @@ class EarningsController extends Controller
         ]);
     }
 
+    /**
+     * Display earnings for the logged-in instructor.
+     */
+    public function instructorEarnings()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        // Get all receipts where this instructor's classes were booked
+        $earnings = Receipt::whereHas('scheduledClass', function($query) use ($user) {
+                $query->where('instructor_id', $user->id);
+            })
+            ->with(['user', 'scheduledClass.classType'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        // Calculate total earnings
+        $totalEarnings = Receipt::whereHas('scheduledClass', function($query) use ($user) {
+                $query->where('instructor_id', $user->id);
+            })
+            ->sum('amount');
+
+        // Calculate this month's earnings
+        $monthEarnings = Receipt::whereHas('scheduledClass', function($query) use ($user) {
+                $query->where('instructor_id', $user->id);
+            })
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('amount');
+
+        // Get monthly stats for chart
+        $monthlyStats = Receipt::whereHas('scheduledClass', function($query) use ($user) {
+                $query->where('instructor_id', $user->id);
+            })
+            ->select(
+                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month_key'),
+                DB::raw('DATE_FORMAT(created_at, "%b") as month_label'),
+                DB::raw('SUM(amount) as total')
+            )
+            ->where('created_at', '>=', now()->subMonths(12))
+            ->groupBy('month_key', 'month_label')
+            ->orderBy('month_key', 'ASC')
+            ->get();
+
+        $monthlyLabels = $monthlyStats->pluck('month_label')->toArray();
+        $monthlyEarnings = $monthlyStats->pluck('total')->toArray();
+
+        if (empty($monthlyLabels)) {
+            $monthlyLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            $monthlyEarnings = array_fill(0, 12, 0);
+        }
+
+        return view('instructor.earnings', compact(
+            'earnings',
+            'totalEarnings',
+            'monthEarnings',
+            'monthlyLabels',
+            'monthlyEarnings'
+        ));
+    }
+
+    /**
+     * Export receipts as PDF.
+     */
     public function exportPdf()
     {
         $receipts = Receipt::with(['user','scheduledClass.classType','scheduledClass.instructor'])->latest()->get();
@@ -48,6 +118,9 @@ class EarningsController extends Controller
         return $pdf->download('earnings_report.pdf');
     }
 
+    /**
+     * Export receipts as CSV.
+     */
     public function exportCsv()
     {
         $receipts = Receipt::with(['user','scheduledClass.classType','scheduledClass.instructor'])->latest()->get();
@@ -76,6 +149,9 @@ class EarningsController extends Controller
         return Excel::download($export, 'earnings_report.csv');
     }
 
+    /**
+     * Export receipts as Excel.
+     */
     public function exportExcel()
     {
         $receipts = Receipt::with(['user','scheduledClass.classType','scheduledClass.instructor'])->latest()->get();
@@ -104,11 +180,17 @@ class EarningsController extends Controller
         return Excel::download($export, 'earnings_report.xlsx');
     }
 
+    /**
+     * Export instructor payout report.
+     */
     public function instructorPayoutReport()
     {
         return Excel::download(new InstructorPayoutExport(), 'payout_report.xlsx');
     }
 
+    /**
+     * Get monthly labels for chart.
+     */
     private function getMonthlyLabels()
     {
         return collect(range(1, 12))
@@ -116,6 +198,9 @@ class EarningsController extends Controller
             ->toArray();
     }
 
+    /**
+     * Get monthly earnings data for chart.
+     */
     private function getMonthlyEarnings()
     {
         return collect(range(1, 12))->map(fn($m) =>
@@ -125,6 +210,9 @@ class EarningsController extends Controller
         )->toArray();
     }
 
+    /**
+     * Display all receipts with pagination.
+     */
     public function all(Request $request)
     {
         $query = Receipt::with(['user', 'scheduledClass.classType', 'scheduledClass.instructor']);
@@ -140,13 +228,15 @@ class EarningsController extends Controller
         ]);
     }
 
+    /**
+     * Display all transactions (alias for all method).
+     */
     public function allTransactions()
-{
-    $recentReceipts = Receipt::with(['user', 'scheduledClass.instructor', 'scheduledClass.classType'])
-        ->orderByDesc('created_at')
-        ->paginate(20); // adjust per-page size as needed
+    {
+        $recentReceipts = Receipt::with(['user', 'scheduledClass.instructor', 'scheduledClass.classType'])
+            ->orderByDesc('created_at')
+            ->paginate(20);
 
-    return view('admin.earnings.all', compact('recentReceipts'));
-}
-
+        return view('admin.earnings.all', compact('recentReceipts'));
+    }
 }
