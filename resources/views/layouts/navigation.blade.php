@@ -32,12 +32,16 @@
                                 Dashboard
                             </x-nav-link>
 
-                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                            <x-nav-link :href="route('member.classes')" :active="request()->routeIs('member.classes')">
                                 Available Classes
                             </x-nav-link>
 
-                            <x-nav-link :href="route('bookings.index')" :active="request()->routeIs('bookings.*')">
+                            <x-nav-link :href="route('member.bookings')" :active="request()->routeIs('member.bookings')">
                                 My Bookings
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('member.receipts')" :active="request()->routeIs('member.receipts')">
+                                My Receipts
                             </x-nav-link>
 
                         @endif
@@ -120,13 +124,21 @@
 
                         <!-- Role-based quick links -->
                         @if(auth()->user()->role === 'member')
-                            <x-dropdown-link :href="route('bookings.index')" class="flex items-center gap-2">
+                            <x-dropdown-link :href="route('member.bookings')" class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                                 </svg>
                                 My Bookings
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('bookings.create')" class="flex items-center gap-2">
+
+                            <x-dropdown-link :href="route('member.receipts')" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                My Receipts
+                            </x-dropdown-link>
+
+                            <x-dropdown-link :href="route('member.classes')" class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
@@ -242,16 +254,16 @@
 
                 <!-- Mobile Role-Based Links -->
                 @if(auth()->user()->role === 'member')
-                    <x-responsive-nav-link :href="route('bookings.index')" :active="request()->routeIs('bookings.*')">
+                    <x-responsive-nav-link :href="route('member.bookings')" :active="request()->routeIs('member.bookings')">
                         My Bookings
                     </x-responsive-nav-link>
 
-                    <x-responsive-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
-                        Classes
+                    <x-responsive-nav-link :href="route('member.receipts')" :active="request()->routeIs('member.receipts')">
+                        My Receipts
                     </x-responsive-nav-link>
 
-                    <x-responsive-nav-link :href="route('bookings.create')" :active="request()->routeIs('bookings.create')">
-                        Book a Class
+                    <x-responsive-nav-link :href="route('member.classes')" :active="request()->routeIs('member.classes')">
+                        Available Classes
                     </x-responsive-nav-link>
                 @endif
 

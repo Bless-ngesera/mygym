@@ -33,7 +33,7 @@ Route::middleware('auth')->group(function () {
     // Dashboard (uses __invoke method)
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
-    // Bookings
+    // ==================== BOOKING ROUTES (Legacy - kept for compatibility) ====================
     Route::prefix('bookings')->name('bookings.')->group(function () {
         Route::get('/', [BookingController::class, 'index'])->name('index');
         Route::get('/create', [BookingController::class, 'create'])->name('create');
@@ -60,34 +60,42 @@ Route::middleware('auth')->group(function () {
             return view('member.dashboard');
         })->name('dashboard');
 
-        // Available classes (view only)
-        Route::get('/classes', [ScheduledClassController::class, 'upcoming'])->name('classes');
+        // Available classes (browse)
+        Route::get('/classes', [BookingController::class, 'create'])->name('classes');
 
-        // Book a class (standard POST, redirects back)
-        Route::post('/classes/{scheduledClass}/book', [ScheduledClassController::class, 'book'])->name('book');
+        // Book a class
+        Route::post('/classes/book', [BookingController::class, 'store'])->name('book');
 
         // My bookings
-        Route::get('/bookings', [ScheduledClassController::class, 'myBookings'])->name('bookings');
+        Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
+        Route::get('/bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
+        Route::get('/bookings/past', [BookingController::class, 'past'])->name('bookings.past');
 
         // Cancel a booking
-        Route::delete('/bookings/{scheduledClass}', [ScheduledClassController::class, 'cancelBooking'])->name('cancel-booking');
+        Route::delete('/bookings/{id}', [BookingController::class, 'destroy'])->name('cancel-booking');
 
-        // Get available classes (AJAX filtering - optional)
-        Route::get('/available-classes', [ScheduledClassController::class, 'getAvailableClasses'])->name('available-classes');
+        // Receipts (via BookingController for member-specific)
+        Route::get('/receipts', [BookingController::class, 'receipts'])->name('receipts');
+        Route::get('/receipts/{bookingId}', [BookingController::class, 'receipt'])->name('receipt');
+
+        // Check availability (AJAX)
+        Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
     });
 
     // ==================== LEGACY CLASSES ROUTES (keep for backward compatibility) ====================
-    // These routes might be used elsewhere, keeping them but they will redirect to member routes
     Route::prefix('classes')->name('classes.')->group(function () {
-        Route::get('/', [ScheduledClassController::class, 'upcoming'])->name('index');
-        Route::post('/{scheduledClass}/book', [ScheduledClassController::class, 'book'])->name('book');
+        Route::get('/', [BookingController::class, 'create'])->name('index');
+        Route::post('/book', [BookingController::class, 'store'])->name('book');
     });
 
-    // Receipts
+    // ==================== RECEIPTS ROUTES ====================
     Route::prefix('receipts')->name('receipts.')->group(function () {
         Route::get('/', [ReceiptController::class, 'index'])->name('index');
-        Route::post('/', [ReceiptController::class, 'store'])->name('store');
         Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
+        Route::get('/{receipt}/download', [ReceiptController::class, 'download'])->name('download');
+        Route::get('/{receipt}/preview', [ReceiptController::class, 'preview'])->name('preview');
+        Route::get('/{receipt}/print', [ReceiptController::class, 'print'])->name('print');
+        Route::get('/reference/{reference}', [ReceiptController::class, 'findByReference'])->name('find-by-reference');
     });
 
     // ==================== PROFILE ROUTES ====================

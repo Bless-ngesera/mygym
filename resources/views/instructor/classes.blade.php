@@ -85,11 +85,15 @@
                            class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 {{ request('filter') == 'past' ? 'bg-gray-600 text-white shadow-md' : 'bg-white/80 text-gray-700 hover:bg-gray-100 border border-gray-200' }}">
                             Past Classes
                         </a>
+                        <a href="{{ route('instructor.calendar') }}"
+                           class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 bg-white/80 text-gray-700 hover:bg-gray-100 border border-gray-200">
+                            📅 Calendar
+                        </a>
                     </div>
 
                     {{-- Classes Count --}}
                     <div class="mb-4 text-sm text-gray-500">
-                        Showing <span class="font-semibold text-purple-600">{{ isset($classes) ? $classes->total() : 0 }}</span>
+                        Showing <span class="font-semibold text-purple-600">{{ isset($classes) && $classes instanceof \Illuminate\Pagination\LengthAwarePaginator ? $classes->total() : 0 }}</span>
                         @if(request('filter') == 'upcoming')
                             upcoming class(es)
                         @elseif(request('filter') == 'past')
@@ -111,10 +115,10 @@
                                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Booked</th>
                                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Members</th>
-                                </tr>
+                                  </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
-                                @forelse($classes ?? [] as $class)
+                                @forelse(($classes ?? []) as $class)
                                 <tr class="hover:bg-purple-50/30 transition-colors duration-150">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
@@ -164,25 +168,31 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-1">
-                                            <span class="text-lg font-bold text-purple-600">{{ optional($class->members())->count() ?? 0 }}</span>
+                                            <span class="text-lg font-bold text-purple-600">{{ $class->members_count ?? 0 }}</span>
                                             <span class="text-xs text-gray-500">booked</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
                                         @php
-                                            $members = optional($class->members())->take(3) ?? collect();
+                                            $memberList = [];
+                                            // Safely get members if they exist and are a collection
+                                            if (isset($class->members) && $class->members instanceof \Illuminate\Database\Eloquent\Collection) {
+                                                $memberList = $class->members->take(3);
+                                            }
                                         @endphp
-                                        @if($members->count() > 0)
+                                        @if(count($memberList) > 0)
                                             <div class="flex -space-x-2">
-                                                @foreach($members as $member)
-                                                    <img src="https://ui-avatars.com/api/?name={{ urlencode($member->name) }}&background=10b981&color=fff&bold=true&size=32"
-                                                         alt="{{ $member->name }}"
-                                                         class="w-8 h-8 rounded-full ring-2 ring-white"
-                                                         title="{{ $member->name }}">
+                                                @foreach($memberList as $member)
+                                                    @if($member && isset($member->name))
+                                                        <img src="https://ui-avatars.com/api/?name={{ urlencode($member->name) }}&background=10b981&color=fff&bold=true&size=32"
+                                                             alt="{{ $member->name }}"
+                                                             class="w-8 h-8 rounded-full ring-2 ring-white"
+                                                             title="{{ $member->name }}">
+                                                    @endif
                                                 @endforeach
-                                                @if(optional($class->members())->count() > 3)
+                                                @if(isset($class->members) && $class->members instanceof \Illuminate\Database\Eloquent\Collection && $class->members->count() > 3)
                                                     <div class="w-8 h-8 rounded-full bg-gray-200 ring-2 ring-white flex items-center justify-center text-xs font-medium text-gray-600">
-                                                        +{{ optional($class->members())->count() - 3 }}
+                                                        +{{ $class->members->count() - 3 }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -224,7 +234,7 @@
                     </div>
 
                     {{-- Pagination --}}
-                    @if(isset($classes) && $classes->hasPages())
+                    @if(isset($classes) && $classes instanceof \Illuminate\Pagination\LengthAwarePaginator && $classes->hasPages())
                         <div class="mt-6 pt-4 border-t border-gray-100">
                             {{ $classes->links() }}
                         </div>

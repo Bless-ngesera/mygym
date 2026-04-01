@@ -70,7 +70,7 @@
 
             {{-- Classes Count --}}
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden p-4 mb-4 text-sm text-gray-500">
-                Showing <span class="font-semibold text-purple-600">{{ isset($classes) ? $classes->total() : 0 }}</span> available class(es)
+                Showing <span class="font-semibold text-purple-600">{{ isset($classes) && $classes instanceof \Illuminate\Pagination\LengthAwarePaginator ? $classes->total() : 0 }}</span> available class(es)
             </div>
 
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden">
@@ -78,7 +78,7 @@
 
                     {{-- Classes Grid --}}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @forelse($classes ?? [] as $class)
+                        @forelse(($classes ?? []) as $class)
                         <div class="bg-white/80 backdrop-blur-sm border border-white/40 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-1">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="flex items-center gap-3">
@@ -88,14 +88,14 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 class="font-bold text-gray-900 text-lg">{{ $class->classType->name ?? 'Class' }}</h3>
-                                        <p class="text-xs text-gray-500">{{ $class->classType->minutes ?? 0 }} minutes</p>
+                                        <h3 class="font-bold text-gray-900 text-lg">{{ optional($class->classType)->name ?? 'Class' }}</h3>
+                                        <p class="text-xs text-gray-500">{{ optional($class->classType)->minutes ?? 0 }} minutes</p>
                                     </div>
                                 </div>
                                 <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Available</span>
                             </div>
 
-                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">{{ $class->classType->description ?? 'No description available' }}</p>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">{{ optional($class->classType)->description ?? 'No description available' }}</p>
 
                             <div class="space-y-2 pt-3 border-t border-gray-100">
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
@@ -103,7 +103,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
                                     <span class="font-medium">Instructor:</span>
-                                    <span>{{ $class->instructor->name ?? 'TBA' }}</span>
+                                    <span>{{ optional($class->instructor)->name ?? 'TBA' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,14 +131,14 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                     </svg>
                                     <span class="font-medium">Booked:</span>
-                                    <span>{{ optional($class->members())->count() ?? 0 }} / {{ $class->classType->capacity ?? '∞' }}</span>
+                                    <span>{{ $class->members_count ?? 0 }} / {{ optional($class->classType)->capacity ?? '∞' }}</span>
                                 </div>
                             </div>
 
                             <div class="mt-4">
                                 <button type="button"
                                         data-id="{{ $class->id }}"
-                                        data-name="{{ $class->classType->name }}"
+                                        data-name="{{ optional($class->classType)->name }}"
                                         data-price="{{ $class->price ?? 10000 }}"
                                         class="open-payment w-full px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
                                     <span class="flex items-center justify-center gap-2">
@@ -170,7 +170,7 @@
                     </div>
 
                     {{-- Pagination --}}
-                    @if(isset($classes) && $classes->hasPages())
+                    @if(isset($classes) && $classes instanceof \Illuminate\Pagination\LengthAwarePaginator && $classes->hasPages())
                         <div class="mt-8 pt-4 border-t border-gray-100">
                             {{ $classes->links() }}
                         </div>
@@ -182,7 +182,7 @@
 
     {{-- Payment Modal with Standard Form --}}
     <div id="paymentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
-        <form id="bookingForm" method="POST" action="" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
+        <form id="bookingForm" method="POST" action="{{ route('member.book') }}" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
             @csrf
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold text-gray-900">Confirm Booking</h3>
@@ -223,6 +223,9 @@
                 <input id="paymentContactInput" name="payment_contact" type="tel" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500" placeholder="+256 7XX XXX XXX">
                 <p id="paymentContactHelp" class="mt-2 text-xs text-gray-500">Enter the mobile money number to receive a confirmation SMS.</p>
             </div>
+
+            {{-- Hidden input for class ID - CRITICAL for booking --}}
+            <input type="hidden" name="scheduled_class_id" id="scheduled_class_id" value="">
 
             <div class="flex justify-end gap-3 mt-6">
                 <button type="button" id="closePaymentModal" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold transition">Cancel</button>
@@ -295,16 +298,17 @@
                     const modalPrice = document.getElementById('modalPrice');
                     const contactInput = document.getElementById('paymentContactInput');
                     const contactWrap = document.getElementById('paymentContactWrap');
-                    const bookingForm = document.getElementById('bookingForm');
+                    const hiddenClassId = document.getElementById('scheduled_class_id');
 
                     if (modalClassName) modalClassName.textContent = name;
                     if (modalPrice) modalPrice.textContent = 'UGX ' + price.toLocaleString();
                     if (contactInput) contactInput.value = '';
                     if (contactWrap) contactWrap.classList.add('hidden');
 
-                    // Set the form action URL for standard POST submission
-                    if (bookingForm) {
-                        bookingForm.action = `/member/classes/${currentClassId}/book`;
+                    // Set the hidden input value with the class ID
+                    if (hiddenClassId) {
+                        hiddenClassId.value = currentClassId;
+                        console.log('Class ID set to:', hiddenClassId.value); // Debug log
                     }
 
                     const defaultMethod = document.querySelector('input[name="payment_method"]:checked')?.value || 'MTN Mobile Money';
@@ -318,6 +322,20 @@
                     }
                 });
             });
+
+            // Add form submit validation
+            const bookingForm = document.getElementById('bookingForm');
+            if (bookingForm) {
+                bookingForm.addEventListener('submit', function(e) {
+                    const hiddenInput = document.getElementById('scheduled_class_id');
+                    if (!hiddenInput || !hiddenInput.value) {
+                        e.preventDefault();
+                        alert('Please select a class first.');
+                        return false;
+                    }
+                    console.log('Submitting booking for class ID:', hiddenInput.value);
+                });
+            }
 
             // Payment method radio listeners
             const paymentRadios = document.querySelectorAll('input[name="payment_method"]');

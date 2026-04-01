@@ -114,7 +114,7 @@ class ScheduledClassController extends Controller
         $filter = request('filter', 'all');
 
         $query = ScheduledClass::where('instructor_id', $user->id)
-            ->with('classType')
+            ->with(['classType', 'members']) // Load members for avatars
             ->withCount('members');
 
         if ($filter === 'upcoming') {
@@ -372,7 +372,7 @@ class ScheduledClassController extends Controller
         }
 
         $classes = ScheduledClass::where('instructor_id', $user->id)
-            ->with(['classType', 'instructor'])
+            ->with(['classType', 'instructor', 'members'])
             ->withCount('members')
             ->orderBy('date_time', 'asc')
             ->get();
