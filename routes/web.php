@@ -164,36 +164,76 @@ Route::middleware('auth')->group(function () {
 
     // ==================== INSTRUCTOR ROUTES ====================
     Route::prefix('instructor')->name('instructor.')->middleware('role:instructor')->group(function () {
-        // Dashboard
+        // Dashboard with full statistics
         Route::get('/dashboard', function () {
             /** @var \App\Models\User $user */
             $user = Auth::user();
 
+            // Total number of unique clients who have booked any class
+            $totalUniqueClients = ScheduledClass::where('instructor_id', $user->id)
+                ->with('members')
+                ->get()
+                ->pluck('members')
+                ->flatten()
+                ->unique('id')
+                ->count();
+
+            // Total number of bookings across all classes
+            $totalBookings = ScheduledClass::where('instructor_id', $user->id)
+                ->withCount('members')
+                ->get()
+                ->sum('members_count');
+
+            // Total number of classes
             $totalClasses = ScheduledClass::where('instructor_id', $user->id)->count();
+
+            // Upcoming classes count
             $upcomingClasses = ScheduledClass::where('instructor_id', $user->id)
                 ->where('date_time', '>', Carbon::now())
                 ->count();
+
+            // Past classes count
+            $pastClasses = ScheduledClass::where('instructor_id', $user->id)
+                ->where('date_time', '<', Carbon::now())
+                ->count();
+
+            // Total students (including repeats)
             $totalStudents = ScheduledClass::where('instructor_id', $user->id)
                 ->withCount('members')
                 ->get()
                 ->sum('members_count');
 
+            // Calculate total earnings from receipts
             $totalEarnings = Receipt::whereHas('scheduledClass', function($query) use ($user) {
                 $query->where('instructor_id', $user->id);
             })->sum('amount');
 
+            // Recent classes
             $recentClasses = ScheduledClass::where('instructor_id', $user->id)
-                ->with('classType')
+                ->with(['classType', 'instructor'])
+                ->withCount('members')
                 ->latest()
                 ->take(5)
                 ->get();
 
+            // Top classes by bookings
+            $topClasses = ScheduledClass::where('instructor_id', $user->id)
+                ->with('classType')
+                ->withCount('members')
+                ->orderBy('members_count', 'desc')
+                ->take(5)
+                ->get();
+
             return view('instructor.dashboard', compact(
+                'totalUniqueClients',
+                'totalBookings',
                 'totalClasses',
                 'upcomingClasses',
+                'pastClasses',
                 'totalStudents',
                 'totalEarnings',
-                'recentClasses'
+                'recentClasses',
+                'topClasses'
             ));
         })->name('dashboard');
 
@@ -212,6 +252,9 @@ Route::middleware('auth')->group(function () {
 
         // Calendar
         Route::get('/calendar', [ScheduledClassController::class, 'calendar'])->name('calendar');
+
+        // Statistics API endpoint
+        Route::get('/statistics', [ScheduledClassController::class, 'statistics'])->name('statistics');
 
         // Schedule management (CRUD)
         Route::get('/schedule/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('schedule.show');

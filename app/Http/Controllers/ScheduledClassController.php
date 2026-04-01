@@ -5,12 +5,10 @@ namespace App\Http\Controllers;
 use App\Events\ClassCanceled;
 use App\Models\ClassType;
 use App\Models\ScheduledClass;
-use App\Models\Receipt;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\UniqueConstraintViolationException;
 
@@ -32,6 +30,7 @@ class ScheduledClassController extends Controller
         $scheduledClasses = ScheduledClass::where('instructor_id', $user->id)
             ->upcoming()
             ->with('classType')
+            ->withCount('members')
             ->orderBy('date_time', 'asc')
             ->paginate(10);
 
@@ -115,7 +114,8 @@ class ScheduledClassController extends Controller
         $filter = request('filter', 'all');
 
         $query = ScheduledClass::where('instructor_id', $user->id)
-            ->with('classType');
+            ->with('classType')
+            ->withCount('members');
 
         if ($filter === 'upcoming') {
             $query->where('date_time', '>', Carbon::now());
@@ -148,8 +148,24 @@ class ScheduledClassController extends Controller
         }
 
         $scheduledClass->load(['classType', 'instructor', 'members']);
+        $scheduledClass->loadCount('members');
 
-        return view('instructor.show', compact('scheduledClass'));
+        // Get total unique clients who have booked any class with this instructor
+        $totalClients = ScheduledClass::where('instructor_id', $user->id)
+            ->with('members')
+            ->get()
+            ->pluck('members')
+            ->flatten()
+            ->unique('id')
+            ->count();
+
+        // Get total bookings across all classes
+        $totalBookings = ScheduledClass::where('instructor_id', $user->id)
+            ->withCount('members')
+            ->get()
+            ->sum('members_count');
+
+        return view('instructor.show', compact('scheduledClass', 'totalClients', 'totalBookings'));
     }
 
     /**
@@ -286,192 +302,60 @@ class ScheduledClassController extends Controller
     }
 
     /**
-     * List upcoming classes for members to browse and book.
-     * Excludes classes already booked by the current user.
+     * Get instructor statistics including total clients and bookings.
      */
-    public function upcoming(Request $request)
+    public function statistics()
     {
         /** @var User $user */
         $user = Auth::user();
 
-        // Get classes that are upcoming and not booked by the current user
-        $classes = ScheduledClass::upcoming()
-            ->with(['classType', 'instructor'])
-            ->whereDoesntHave('members', function($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->orderBy('date_time', 'asc')
-            ->paginate(12);
-
-        return view('member.classes', compact('classes'));
-    }
-
-    /**
-     * Book a class for the authenticated member and create a receipt.
-     * Redirects back to the same page with a success/error message.
-     */
-    public function book(Request $request, ScheduledClass $scheduledClass)
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        // Check if user is a member
-        if ($user->role !== 'member') {
-            return redirect()->back()->with('error', 'Only members can book classes.');
+        if ($user->role !== 'instructor') {
+            return redirect()->route('dashboard')->with('error', 'You are not authorized to view this page.');
         }
 
-        // Check if class is in the past
-        if ($scheduledClass->date_time->isPast()) {
-            return redirect()->back()->with('error', 'Cannot book past classes.');
-        }
+        // Total number of unique clients who have booked any class
+        $totalUniqueClients = ScheduledClass::where('instructor_id', $user->id)
+            ->with('members')
+            ->get()
+            ->pluck('members')
+            ->flatten()
+            ->unique('id')
+            ->count();
 
-        // Check if already booked
-        if ($user->bookings()->where('scheduled_class_id', $scheduledClass->id)->exists()) {
-            return redirect()->back()->with('error', 'You have already booked this class.');
-        }
+        // Total number of bookings across all classes
+        $totalBookings = ScheduledClass::where('instructor_id', $user->id)
+            ->withCount('members')
+            ->get()
+            ->sum('members_count');
 
-        try {
-            DB::beginTransaction();
+        // Total number of classes
+        $totalClasses = ScheduledClass::where('instructor_id', $user->id)->count();
 
-            // Create the booking
-            $user->bookings()->attach($scheduledClass->id);
+        // Upcoming classes count
+        $upcomingClasses = ScheduledClass::where('instructor_id', $user->id)
+            ->where('date_time', '>', Carbon::now())
+            ->count();
 
-            // Generate unique receipt number
-            $receiptNumber = 'RCP-' . strtoupper(uniqid()) . '-' . date('Ymd');
+        // Past classes count
+        $pastClasses = ScheduledClass::where('instructor_id', $user->id)
+            ->where('date_time', '<', Carbon::now())
+            ->count();
 
-            // Create receipt
-            $receipt = Receipt::create([
-                'reference_number' => $receiptNumber,
-                'user_id' => $user->id,
-                'scheduled_class_id' => $scheduledClass->id,
-                'payment_method' => $request->payment_method ?? 'MTN Mobile Money',
-                'amount' => $scheduledClass->price,
-                'payment_contact' => $request->payment_contact ?? null,
-                'status' => 'completed',
-            ]);
-
-            DB::commit();
-
-            // Redirect back with success message and receipt link
-            return redirect()->back()->with('success', 'Class booked successfully! Receipt #' . $receipt->reference_number . ' has been generated. <a href="' . route('receipts.show', $receipt) . '" class="text-green-800 underline font-semibold">View Receipt →</a>');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Booking error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Unable to book class. Please try again.');
-        }
-    }
-
-    /**
-     * Display member's booked classes.
-     */
-    public function myBookings()
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view their bookings.');
-        }
-
-        $bookings = $user->bookings()
-            ->with(['classType', 'instructor'])
-            ->orderBy('date_time', 'asc')
-            ->paginate(10);
-
-        // Pass both classes and bookings for the view
-        return view('member.classes', [
-            'classes' => $bookings,
-            'bookings' => $bookings,
-            'isBookingsPage' => true
-        ]);
-    }
-
-    /**
-     * Cancel a booking for a member.
-     * Redirects back to the same page with a success/error message.
-     */
-    public function cancelBooking(Request $request, ScheduledClass $scheduledClass)
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if ($user->role !== 'member') {
-            return redirect()->back()->with('error', 'Only members can cancel bookings.');
-        }
-
-        if ($scheduledClass->date_time->isPast()) {
-            return redirect()->back()->with('error', 'Cannot cancel past classes.');
-        }
-
-        // Check if the class is starting soon (within 2 hours)
-        $hoursUntilClass = Carbon::now()->diffInHours($scheduledClass->date_time, false);
-
-        if ($hoursUntilClass < 2 && $hoursUntilClass > 0) {
-            return redirect()->back()->with('error', 'Cannot cancel class within 2 hours of start time.');
-        }
-
-        // Check if actually booked
-        if (!$user->bookings()->where('scheduled_class_id', $scheduledClass->id)->exists()) {
-            return redirect()->back()->with('error', 'You have not booked this class.');
-        }
-
-        try {
-            DB::beginTransaction();
-
-            // Delete associated receipts first (optional - if you want to keep receipts for canceled bookings)
-            // Receipt::where('scheduled_class_id', $scheduledClass->id)
-            //     ->where('user_id', $user->id)
-            //     ->delete();
-
-            // Remove the booking
-            $user->bookings()->detach($scheduledClass->id);
-
-            DB::commit();
-
-            return redirect()->back()->with('success', 'Booking cancelled successfully!');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Cancel booking error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Unable to cancel booking. Please try again.');
-        }
-    }
-
-    /**
-     * Get upcoming classes for a member with filtering.
-     */
-    public function getAvailableClasses(Request $request)
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        $query = ScheduledClass::upcoming()
-            ->with(['classType', 'instructor'])
-            ->whereDoesntHave('members', function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            });
-
-        // Apply filters
-        if ($request->has('class_type_id') && $request->class_type_id) {
-            $query->where('class_type_id', $request->class_type_id);
-        }
-
-        if ($request->has('date_from') && $request->date_from) {
-            $query->where('date_time', '>=', Carbon::parse($request->date_from));
-        }
-
-        if ($request->has('date_to') && $request->date_to) {
-            $query->where('date_time', '<=', Carbon::parse($request->date_to));
-        }
-
-        $classes = $query->orderBy('date_time', 'asc')->paginate(12);
+        // Classes with most bookings
+        $topClasses = ScheduledClass::where('instructor_id', $user->id)
+            ->with('classType')
+            ->withCount('members')
+            ->orderBy('members_count', 'desc')
+            ->take(5)
+            ->get();
 
         return response()->json([
-            'data' => $classes->items(),
-            'current_page' => $classes->currentPage(),
-            'last_page' => $classes->lastPage(),
-            'total' => $classes->total(),
+            'total_unique_clients' => $totalUniqueClients,
+            'total_bookings' => $totalBookings,
+            'total_classes' => $totalClasses,
+            'upcoming_classes' => $upcomingClasses,
+            'past_classes' => $pastClasses,
+            'top_classes' => $topClasses,
         ]);
     }
 
@@ -488,14 +372,10 @@ class ScheduledClassController extends Controller
         }
 
         $classes = ScheduledClass::where('instructor_id', $user->id)
-            ->with('classType')
+            ->with(['classType', 'instructor'])
+            ->withCount('members')
+            ->orderBy('date_time', 'asc')
             ->get();
-
-        // Check if the view exists, if not redirect to upcoming classes
-        if (!view()->exists('instructor.calendar')) {
-            return redirect()->route('instructor.upcoming')
-                ->with('info', 'Calendar view is coming soon. Here are your upcoming classes.');
-        }
 
         return view('instructor.calendar', compact('classes'));
     }

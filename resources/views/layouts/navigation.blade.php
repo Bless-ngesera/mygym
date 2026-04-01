@@ -55,6 +55,10 @@
                                 Upcoming Classes
                             </x-nav-link>
 
+                            <x-nav-link :href="route('instructor.calendar')" :active="request()->routeIs('instructor.calendar')">
+                                Calendar
+                            </x-nav-link>
+
                             <x-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">
                                 My Earnings
                             </x-nav-link>
@@ -161,6 +165,13 @@
                                 Upcoming Classes
                             </x-dropdown-link>
 
+                            <x-dropdown-link :href="route('instructor.calendar')" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Calendar View
+                            </x-dropdown-link>
+
                         @endif
 
                         <x-dropdown-link :href="route('profile.edit')" class="flex items-center gap-2">
@@ -255,6 +266,10 @@
 
                     <x-responsive-nav-link :href="route('instructor.create')" :active="request()->routeIs('instructor.create')">
                         Schedule a Class
+                    </x-responsive-nav-link>
+
+                    <x-responsive-nav-link :href="route('instructor.calendar')" :active="request()->routeIs('instructor.calendar')">
+                        Calendar
                     </x-responsive-nav-link>
 
                     <x-responsive-nav-link :href="route('instructor.earnings')" :active="request()->routeIs('instructor.earnings')">
