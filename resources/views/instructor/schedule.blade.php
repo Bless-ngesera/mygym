@@ -122,6 +122,26 @@
                                 </div>
                             </div>
 
+                            <!-- Price Field - ADDED -->
+                            <div>
+                                <label class="text-sm font-semibold text-gray-700 block mb-2 uppercase tracking-wide">Price (UGX)</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">UGX</span>
+                                    <input type="number"
+                                           name="price"
+                                           value="{{ old('price') }}"
+                                           step="1000"
+                                           min="0"
+                                           placeholder="0"
+                                           class="w-full pl-12 pr-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all @error('price') border-red-500 @enderror"
+                                           required>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Enter the class price in Ugandan Shillings (UGX)</p>
+                                @error('price')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <!-- Schedule Button -->
                             <div class="pt-4">
                                 <button type="submit"
@@ -155,6 +175,12 @@
 
         .animate-fade-in {
             animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Remove number input spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            opacity: 0.5;
         }
     </style>
 

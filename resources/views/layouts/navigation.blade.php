@@ -28,17 +28,18 @@
 
                         <!-- Role-Based Navigation Links -->
                         @if(auth()->user()->role === 'member')
+                            <x-nav-link :href="route('member.dashboard')" :active="request()->routeIs('member.dashboard')">
+                                Dashboard
+                            </x-nav-link>
+
+                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
+                                Available Classes
+                            </x-nav-link>
+
                             <x-nav-link :href="route('bookings.index')" :active="request()->routeIs('bookings.*')">
                                 My Bookings
                             </x-nav-link>
 
-                            <x-nav-link :href="route('classes.index')" :active="request()->routeIs('classes.*')">
-                                Classes
-                            </x-nav-link>
-
-                            <x-nav-link :href="route('bookings.create')" :active="request()->routeIs('bookings.create')">
-                                Book a Class
-                            </x-nav-link>
                         @endif
 
                         @if(auth()->user()->role === 'instructor')

@@ -1,10 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Upcoming Classes
-            </h2>
-            <a href="{{ route('schedule.create') }}"
+            <div>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                    Upcoming Classes
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Manage your scheduled fitness classes</p>
+            </div>
+            <a href="{{ route('instructor.create') }}"
                class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                 + Schedule New Class
             </a>
@@ -17,7 +20,7 @@
         background-position: center;
         background-attachment: fixed;">
 
-        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
             {{-- Success Message --}}
             @if(session('success'))
@@ -36,7 +39,24 @@
                 </div>
             @endif
 
-            {{-- Error Messages --}}
+            {{-- Error Message --}}
+            @if(session('error'))
+                <div id="errorMessage" class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl shadow-md flex items-center justify-between animate-fade-in">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                    <button onclick="this.parentElement.style.display='none'" class="text-red-700 hover:text-red-900">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            @endif
+
+            {{-- Validation Errors --}}
             @if($errors->any())
                 <div id="errorMessage" class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl shadow-md">
                     <div class="flex items-center mb-2">
@@ -53,6 +73,11 @@
                 </div>
             @endif
 
+            {{-- Classes Count --}}
+            <div class="mb-4 text-sm text-gray-500">
+                Showing <span class="font-semibold text-purple-600">{{ $scheduledClasses->total() }}</span> upcoming class(es)
+            </div>
+
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden">
                 <div class="p-6 md:p-8">
                     @forelse ($scheduledClasses as $class)
@@ -68,7 +93,11 @@
                                         </div>
                                         <div>
                                             <p class="text-xl font-bold text-gray-800">{{ $class->classType->name }}</p>
-                                            <span class="text-sm text-gray-500">{{ $class->classType->minutes }} minutes</span>
+                                            <div class="flex items-center gap-2 text-sm text-gray-500">
+                                                <span>{{ $class->classType->minutes }} minutes</span>
+                                                <span>•</span>
+                                                <span class="font-semibold text-emerald-600">UGX {{ number_format($class->price ?? 0, 0) }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -85,7 +114,7 @@
 
                                 <!-- Actions -->
                                 <div class="flex gap-2 w-full md:w-auto">
-                                    <a href="{{ route('schedule.edit', $class->id) }}"
+                                    <a href="{{ route('instructor.schedule.edit', $class->id) }}"
                                        class="flex-1 md:flex-none px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1 border border-amber-200">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -93,11 +122,10 @@
                                         Edit
                                     </a>
 
-                                    <form method="post" action="{{ route('schedule.destroy', $class->id) }}" class="flex-1 md:flex-none">
+                                    <form method="post" action="{{ route('instructor.schedule.destroy', $class->id) }}" class="flex-1 md:flex-none" onsubmit="return confirm('Are you sure you want to cancel this class? This action cannot be undone.')">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit"
-                                                onclick="return confirm('Are you sure you want to cancel this class?')"
                                                 class="w-full px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1 border border-red-200">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -108,17 +136,18 @@
                                 </div>
                             </div>
 
-                            <!-- Booked Members Count (Optional) -->
-                            @if($class->members()->count() > 0)
-                                <div class="mt-3 pt-3 border-t border-gray-100">
-                                    <div class="flex items-center gap-2 text-sm text-gray-500">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                        </svg>
-                                        <span>{{ $class->members()->count() }} member(s) booked</span>
-                                    </div>
+                            <!-- Booked Members Count -->
+                            <div class="mt-3 pt-3 border-t border-gray-100">
+                                <div class="flex items-center gap-2 text-sm text-gray-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                    <span>{{ $class->members()->count() }} member(s) booked</span>
+                                    @if($class->classType->capacity)
+                                        <span class="text-gray-400">(max {{ $class->classType->capacity }})</span>
+                                    @endif
                                 </div>
-                            @endif
+                            </div>
                         </div>
                     @empty
                         <div class="text-center py-12">
@@ -129,7 +158,7 @@
                             </div>
                             <p class="text-gray-500 text-lg mb-2">No upcoming classes</p>
                             <p class="text-gray-400 text-sm mb-4">You don't have any classes scheduled yet</p>
-                            <a href="{{ route('schedule.create') }}"
+                            <a href="{{ route('instructor.create') }}"
                                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>

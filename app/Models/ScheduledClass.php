@@ -11,16 +11,16 @@ class ScheduledClass extends Model
 {
     use HasFactory;
 
-    // Allow mass assignment for all attributes
     protected $guarded = [];
 
     protected $casts = [
         'date_time' => 'datetime',
-        'price'     => 'decimal:2', // ✅ ensures price is always treated as decimal
+        'price'     => 'decimal:2',
     ];
 
     /**
-     * Instructor relationship (points to users table where role = instructor)
+     * Instructor relationship - points directly to User model
+     * Since instructors are stored in the users table with role = 'instructor'
      */
     public function instructor()
     {
@@ -30,13 +30,13 @@ class ScheduledClass extends Model
     /**
      * Class type relationship
      */
-public function classType() {
-    return $this->belongsTo(ClassType::class);
-}
-
+    public function classType()
+    {
+        return $this->belongsTo(ClassType::class);
+    }
 
     /**
-     * Members relationship (users who booked this class)
+     * Members who booked this class
      */
     public function members()
     {
@@ -45,7 +45,7 @@ public function classType() {
     }
 
     /**
-     * Payments relationship (all payments linked to this class)
+     * Payments linked to this class
      */
     public function payments()
     {
@@ -53,30 +53,32 @@ public function classType() {
     }
 
     /**
-     * Scope: upcoming classes
+     * Scope: upcoming classes only
      */
-    public function scopeUpcoming(Builder $query)
+    public function scopeUpcoming(Builder $query): Builder
     {
         return $query->where('date_time', '>', now());
     }
 
     /**
-     * Scope: classes not booked by the current user
+     * Scope: exclude classes already booked by the current user
      */
-    public function scopeNotBooked(Builder $query)
+    public function scopeNotBookedByUser(Builder $query): Builder
     {
         if (Auth::check()) {
             return $query->whereDoesntHave('members', function ($q) {
                 $q->where('user_id', Auth::id());
             });
         }
+
         return $query;
     }
 
     /**
-     * Scope: order by soonest date
+     * Scope: order by soonest date_time
+     * Named scopeSoonest to avoid overriding Laravel's built-in oldest() scope
      */
-    public function scopeOldest(Builder $query)
+    public function scopeSoonest(Builder $query): Builder
     {
         return $query->orderBy('date_time', 'asc');
     }
