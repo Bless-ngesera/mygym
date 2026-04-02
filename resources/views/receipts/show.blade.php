@@ -9,15 +9,15 @@
             </div>
             <div class="flex gap-3">
                 <a href="{{ route('member.receipts') }}"
-                   class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all duration-200">
+                   class="no-print px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all duration-200">
                     ← Back to Receipts
                 </a>
                 <a href="{{ route('receipts.download', $receipt) }}"
-                   class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
+                   class="no-print px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                     📥 Download PDF
                 </a>
                 <button onclick="window.print()"
-                        class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
+                        class="no-print px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                     🖨️ Print
                 </button>
             </div>
@@ -31,26 +31,24 @@
         background-attachment: fixed;">
 
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            <!-- Premium Receipt Card -->
-            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-                <!-- Header with gradient accent -->
-                <div class="relative bg-gradient-to-r from-gray-50 via-white to-gray-50 px-8 pt-8 pb-6 border-b border-gray-100">
-                    <!-- Decorative elements -->
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full -mr-16 -mt-16 opacity-30"></div>
-                    <div class="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100 rounded-full -ml-12 -mb-12 opacity-30"></div>
+
+            <div id="receipt-card" class="bg-white rounded-2xl shadow-xl overflow-hidden">
+
+                {{-- ── HEADER ── --}}
+                <div class="receipt-header relative px-8 pt-8 pb-6 border-b border-gray-100">
+                    <div class="deco-tr absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full opacity-30"
+                         style="margin-right:-4rem;margin-top:-4rem;"></div>
+                    <div class="deco-bl absolute bottom-0 left-0 w-24 h-24 bg-indigo-100 rounded-full opacity-30"
+                         style="margin-left:-3rem;margin-bottom:-3rem;"></div>
 
                     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
                         <div class="flex items-center gap-4">
-                            <!-- Company Logo -->
-                            <img src="{{ asset('images/Project_Logo.png') }}"
-                                 alt="MyGym Logo"
-                                 class="h-12 w-auto">
+                            <img src="{{ asset('images/Project_Logo.png') }}" alt="MyGym Logo" class="h-12 w-auto">
                             <div class="border-l-2 border-gray-200 pl-4">
                                 <h1 class="text-2xl font-black text-gray-900">Official <span class="text-purple-600">Receipt</span></h1>
                                 <p class="text-xs text-gray-500 uppercase tracking-wider">Payment Confirmation</p>
                             </div>
                         </div>
-
                         <div class="text-right">
                             <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,11 +61,12 @@
                     </div>
                 </div>
 
-                <!-- Content -->
+                {{-- ── BODY ── --}}
                 <div class="px-8 py-8">
-                    <!-- Member & Payment Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div class="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
+
+                    {{-- Row 1: Member + Payment --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="card-member bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
                             <div class="flex items-center gap-2 mb-4">
                                 <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
                                     <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,7 +80,7 @@
                             <p class="text-xs text-gray-400 mt-3">Member ID: #{{ $receipt->user->id }}</p>
                         </div>
 
-                        <div class="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
+                        <div class="card-payment bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
                             <div class="flex items-center gap-2 mb-4">
                                 <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                                     <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,9 +107,9 @@
                         </div>
                     </div>
 
-                    <!-- Class & Schedule Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div class="border border-gray-100 rounded-2xl p-6 hover:shadow-md transition-shadow">
+                    {{-- Row 2: Class + Schedule --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="border border-gray-100 rounded-2xl p-6">
                             <div class="flex items-center gap-2 mb-4">
                                 <div class="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
                                     <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,7 +129,7 @@
                             @endif
                         </div>
 
-                        <div class="border border-gray-100 rounded-2xl p-6 hover:shadow-md transition-shadow">
+                        <div class="border border-gray-100 rounded-2xl p-6">
                             <div class="flex items-center gap-2 mb-4">
                                 <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,19 +153,17 @@
                         </div>
                     </div>
 
-                    <!-- QR Code Section with Verification -->
-                    <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-5 mb-6">
+                    {{-- QR & Verification --}}
+                    <div class="qr-strip rounded-2xl p-5 mb-6">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="flex items-center gap-4">
+                                @php
+                                    $receiptUrl = route('receipts.show', $receipt->id);
+                                    $qrCodeUrl  = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($receiptUrl);
+                                @endphp
                                 <div class="w-20 h-20 bg-white rounded-xl flex items-center justify-center shadow-sm p-2">
-                                    @php
-                                        $receiptUrl = route('receipts.show', $receipt->id);
-                                        $qrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($receiptUrl);
-                                    @endphp
-                                    <img src="{{ $qrCodeUrl }}"
-                                         alt="QR Code"
-                                         class="w-full h-full object-contain"
-                                         onerror="this.onerror=null; this.src='https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl={{ urlencode($receiptUrl) }}&chld=L|1';">
+                                    <img src="{{ $qrCodeUrl }}" alt="QR Code" class="w-full h-full object-contain"
+                                         onerror="this.src='https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl={{ urlencode($receiptUrl) }}&chld=L|1';">
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500 uppercase tracking-wider">Verify Receipt</p>
@@ -189,40 +186,116 @@
                         </div>
                     </div>
 
-                    <!-- Footer -->
+                    {{-- Footer --}}
                     <div class="text-center pt-4 border-t border-gray-100">
                         <p class="text-xs text-gray-400">This is a computer-generated receipt and requires no signature.</p>
                         <p class="text-xs text-gray-400 mt-1">© {{ date('Y') }} MyGym - All rights reserved.</p>
                         <p class="text-xs text-gray-400 mt-2">For inquiries, contact support@mygym.com</p>
                     </div>
                 </div>
-            </div>
+            </div>{{-- end #receipt-card --}}
+
         </div>
     </div>
 
     <style>
+        /* Screen: QR strip background */
+        .qr-strip {
+            background: linear-gradient(to right, #f9fafb, #f3f4f6);
+        }
+        /* Screen: receipt header gradient */
+        .receipt-header {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f8fafc 100%);
+        }
+
+        /* ════════════════════════════════════════
+           PRINT — visibility trick:
+           hide the whole body, then reveal only
+           #receipt-card and everything inside it.
+           This is the most reliable cross-browser
+           approach and avoids blank-page bugs.
+           ════════════════════════════════════════ */
         @media print {
-            .print\:hidden {
-                display: none !important;
+            @page {
+                size: A4 portrait;
+                margin: 1cm;
             }
-            body {
-                background: white !important;
+
+            /* Force colours & backgrounds to print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
-            header, .flex.justify-between.items-center, .py-12 {
-                display: none !important;
+
+            /* 1. Make everything invisible */
+            body * {
+                visibility: hidden !important;
             }
-            .bg-gradient-to-r, .bg-gray-50, .bg-white {
-                background: white !important;
+
+            /* 2. Make the receipt and its children visible */
+            #receipt-card,
+            #receipt-card * {
+                visibility: visible !important;
             }
-            .shadow-xl, .shadow-md, .shadow-sm {
+
+            /* 3. Pull the card to the top-left corner of the page */
+            #receipt-card {
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
                 box-shadow: none !important;
-            }
-            .border {
-                border-color: #e5e7eb !important;
-            }
-            .rounded-2xl, .rounded-xl {
                 border-radius: 0 !important;
+                overflow: visible !important;
             }
+
+            /* Hide the nav buttons (they are inside body so need explicit hide) */
+            .no-print {
+                display: none !important;
+                visibility: hidden !important;
+            }
+
+            /* ── Named element colours ── */
+            .receipt-header {
+                background: linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f8fafc 100%) !important;
+                border-bottom: 1px solid #eef2f8 !important;
+            }
+            .deco-tr { background: #ede9fe !important; }
+            .deco-bl { background: #e0e7ff !important; }
+            .card-member,
+            .card-payment { background: #f8fafc !important; }
+            .qr-strip     { background: #f1f5f9 !important; }
+
+            /* ── Tailwind colour overrides ── */
+            .bg-purple-100  { background-color: #f5f3ff !important; }
+            .bg-emerald-100 { background-color: #ecfdf5 !important; }
+            .bg-orange-100  { background-color: #fff7ed !important; }
+            .bg-blue-100    { background-color: #eff6ff !important; }
+            .bg-green-100   { background-color: #dcfce7 !important; }
+            .bg-gray-100    { background-color: #f3f4f6 !important; }
+
+            .text-purple-600  { color: #7c3aed !important; }
+            .text-emerald-600 { color: #059669 !important; }
+            .text-orange-600  { color: #ea580c !important; }
+            .text-blue-600    { color: #2563eb !important; }
+            .text-green-600,
+            .text-green-700   { color: #15803d !important; }
+            .text-gray-900    { color: #0f172a !important; }
+            .text-gray-800    { color: #1e293b !important; }
+            .text-gray-700    { color: #374151 !important; }
+            .text-gray-600    { color: #475569 !important; }
+            .text-gray-500    { color: #64748b !important; }
+            .text-gray-400    { color: #94a3b8 !important; }
+            .text-gray-300    { color: #cbd5e1 !important; }
+
+            /* ── Layout ── */
+            .grid            { display: grid !important; }
+            .md\:grid-cols-2 { grid-template-columns: 1fr 1fr !important; }
+            .gap-6           { gap: 14px !important; }
+            .mb-6            { margin-bottom: 12px !important; }
+            .shadow-xl,
+            .shadow-md,
+            .shadow-sm       { box-shadow: none !important; }
         }
     </style>
 </x-app-layout>
