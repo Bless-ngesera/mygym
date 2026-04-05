@@ -18,166 +18,120 @@ use Carbon\Carbon;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Public Routes
 |--------------------------------------------------------------------------
 */
 
-// Public routes
-Route::get('/', function () {
-    return view('welcome');
-})->name('home');
+Route::get('/', fn() => view('welcome'))->name('home');
 
-// Authenticated routes
+// Public class listing (no auth required)
+Route::get('/classes', [ScheduledClassController::class, 'publicIndex'])->name('classes.index');
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Routes
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth')->group(function () {
 
-    // Dashboard (uses __invoke method)
+    /*
+    |----------------------------------------------------------------------
+    | Shared Dashboard — redirects based on role
+    |----------------------------------------------------------------------
+    */
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
-    // ==================== BOOKING ROUTES (Legacy - kept for compatibility) ====================
-    Route::prefix('bookings')->name('bookings.')->group(function () {
-        Route::get('/', [BookingController::class, 'index'])->name('index');
-        Route::get('/create', [BookingController::class, 'create'])->name('create');
-        Route::post('/', [BookingController::class, 'store'])->name('store');
-        Route::delete('/{id}', [BookingController::class, 'destroy'])->name('destroy');
-    });
-
-    // ==================== SCHEDULE / CLASSES ROUTES ====================
-    // Resource controller for schedule (instructors only)
-    Route::resource('schedule', ScheduledClassController::class)
-        ->parameters(['schedule' => 'scheduledClass'])
-        ->middleware(['role:instructor']);
-
-    // Additional schedule routes
-    Route::prefix('schedule')->name('schedule.')->middleware(['role:instructor'])->group(function () {
-        Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
-        Route::get('/all', [ScheduledClassController::class, 'instructorClasses'])->name('all');
-    });
-
-    // ==================== MEMBER ROUTES ====================
-    Route::prefix('member')->name('member.')->middleware('role:member')->group(function () {
-        // Dashboard
-        Route::get('/dashboard', function () {
-            return view('member.dashboard');
-        })->name('dashboard');
-
-        // Available classes (browse)
-        Route::get('/classes', [BookingController::class, 'create'])->name('classes');
-
-        // Book a class
-        Route::post('/classes/book', [BookingController::class, 'store'])->name('book');
-
-        // My bookings
-        Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
-        Route::get('/bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
-        Route::get('/bookings/past', [BookingController::class, 'past'])->name('bookings.past');
-
-        // Cancel a booking
-        Route::delete('/bookings/{id}', [BookingController::class, 'destroy'])->name('cancel-booking');
-
-        // Receipts (via BookingController for member-specific)
-        Route::get('/receipts', [BookingController::class, 'receipts'])->name('receipts');
-        Route::get('/receipts/{bookingId}', [BookingController::class, 'receipt'])->name('receipt');
-
-        // Check availability (AJAX)
-        Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
-    });
-
-    // ==================== LEGACY CLASSES ROUTES (keep for backward compatibility) ====================
-    Route::prefix('classes')->name('classes.')->group(function () {
-        Route::get('/', [BookingController::class, 'create'])->name('index');
-        Route::post('/book', [BookingController::class, 'store'])->name('book');
-    });
-
-    // ==================== RECEIPTS ROUTES ====================
-    Route::prefix('receipts')->name('receipts.')->group(function () {
-        Route::get('/', [ReceiptController::class, 'index'])->name('index');
-        Route::get('/{receipt}', [ReceiptController::class, 'show'])->name('show');
-        Route::get('/{receipt}/download', [ReceiptController::class, 'download'])->name('download');
-        Route::get('/{receipt}/preview', [ReceiptController::class, 'preview'])->name('preview');
-        Route::get('/{receipt}/print', [ReceiptController::class, 'print'])->name('print');
-        Route::get('/reference/{reference}', [ReceiptController::class, 'findByReference'])->name('find-by-reference');
-    });
-
-    // ==================== PROFILE ROUTES ====================
+    /*
+    |----------------------------------------------------------------------
+    | Profile
+    |----------------------------------------------------------------------
+    */
     Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
-        Route::patch('/', [ProfileController::class, 'update'])->name('update');
-        Route::put('/password', [ProfileController::class, 'passwordUpdate'])->name('password.update');
-        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+        Route::get('/',              [ProfileController::class, 'edit'])->name('edit');
+        Route::patch('/',            [ProfileController::class, 'update'])->name('update');
+        Route::put('/password',      [ProfileController::class, 'passwordUpdate'])->name('password.update');
+        Route::delete('/',           [ProfileController::class, 'destroy'])->name('destroy');
     });
 
-    // ==================== USER SETTINGS ====================
+    /*
+    |----------------------------------------------------------------------
+    | User Settings
+    |----------------------------------------------------------------------
+    */
     Route::prefix('settings')->name('user.settings.')->group(function () {
-        Route::get('/', [SettingsController::class, 'userIndex'])->name('index');
+        Route::get('/',  [SettingsController::class, 'userIndex'])->name('index');
         Route::post('/', [SettingsController::class, 'userUpdate'])->name('update');
     });
 
-    // ==================== ADMIN ROUTES ====================
-    Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
-        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-        Route::get('/', [AdminController::class, 'dashboard'])->name('index');
-
-        // Members Management
-        Route::prefix('members')->name('members.')->group(function () {
-            Route::get('/', [AdminController::class, 'members'])->name('index');
-            Route::get('/create', [AdminController::class, 'createMember'])->name('create');
-            Route::post('/', [AdminController::class, 'storeMember'])->name('store');
-            Route::get('/{id}/edit', [AdminController::class, 'editMember'])->name('edit');
-            Route::put('/{id}', [AdminController::class, 'updateMember'])->name('update');
-            Route::delete('/{id}', [AdminController::class, 'destroyMember'])->name('destroy');
-        });
-
-        // Earnings
-        Route::prefix('earnings')->name('earnings.')->group(function () {
-            Route::get('/', [EarningsController::class, 'index'])->name('index');
-            Route::get('/data', [EarningsController::class, 'earningsData'])->name('data');
-            Route::get('/export-pdf', [EarningsController::class, 'exportPdf'])->name('export.pdf');
-            Route::get('/export-csv', [EarningsController::class, 'exportCsv'])->name('export.csv');
-            Route::get('/export-excel', [EarningsController::class, 'exportExcel'])->name('export.excel');
-            Route::get('/instructor-payout', [EarningsController::class, 'instructorPayoutReport'])->name('instructor.payout');
-            Route::get('/all', [EarningsController::class, 'all'])->name('all');
-            Route::get('/transactions', [EarningsController::class, 'allTransactions'])->name('transactions');
-        });
-
-        // Instructor Management
-        Route::prefix('instructors')->name('instructors.')->group(function () {
-            Route::get('/', [AdminController::class, 'indexInstructors'])->name('index');
-            Route::get('/create', [AdminController::class, 'createInstructor'])->name('create');
-            Route::post('/', [AdminController::class, 'storeInstructor'])->name('store');
-            Route::get('/{id}/edit', [AdminController::class, 'editInstructor'])->name('edit');
-            Route::put('/{id}', [AdminController::class, 'updateInstructor'])->name('update');
-            Route::delete('/{id}', [AdminController::class, 'destroyInstructor'])->name('destroy');
-            Route::get('/download-pdf', [AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
-        });
-
-        // Reports
-        Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/', [ReportsController::class, 'index'])->name('index');
-            Route::post('/generate', [ReportsController::class, 'generate'])->name('generate');
-            Route::get('/download-pdf', [ReportsController::class, 'downloadPdf'])->name('download.pdf');
-            Route::get('/download-excel', [ReportsController::class, 'downloadExcel'])->name('download.excel');
-            Route::get('/download-instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
-        });
-
-        // Admin Settings
-        Route::prefix('settings')->name('settings.')->group(function () {
-            Route::get('/', [SettingsController::class, 'index'])->name('index');
-            Route::post('/', [SettingsController::class, 'update'])->name('update');
-            Route::post('/logo', [SettingsController::class, 'updateLogo'])->name('logo');
-            Route::post('/favicon', [SettingsController::class, 'updateFavicon'])->name('favicon');
-            Route::post('/reset', [SettingsController::class, 'reset'])->name('reset');
-            Route::post('/clear-cache', [SettingsController::class, 'clearCache'])->name('clear-cache');
-        });
+    /*
+    |----------------------------------------------------------------------
+    | Receipts  (shared — members AND admins can access)
+    |----------------------------------------------------------------------
+    */
+    Route::prefix('receipts')->name('receipts.')->group(function () {
+        Route::get('/',                          [ReceiptController::class, 'index'])->name('index');
+        Route::get('/{receipt}',                 [ReceiptController::class, 'show'])->name('show');
+        Route::get('/{receipt}/download',        [ReceiptController::class, 'download'])->name('download');
+        Route::get('/{receipt}/preview',         [ReceiptController::class, 'preview'])->name('preview');
+        Route::get('/{receipt}/print',           [ReceiptController::class, 'print'])->name('print');
+        Route::get('/reference/{reference}',     [ReceiptController::class, 'findByReference'])->name('find-by-reference');
+        Route::post('/{receipt}/resend',         [ReceiptController::class, 'resendReceipt'])->name('resend');
     });
 
-    // ==================== INSTRUCTOR ROUTES ====================
+    /*
+    |======================================================================
+    | MEMBER ROUTES
+    |======================================================================
+    */
+    Route::prefix('member')->name('member.')->middleware('role:member')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard', fn() => view('member.dashboard'))->name('dashboard');
+
+        /*
+        | Classes (browse & book)
+        |
+        | IMPORTANT: GET /member/classes/book must exist alongside POST.
+        | Without it, any browser reload / back-button on that URL throws
+        | 405 MethodNotAllowedHttpException. The GET simply redirects back
+        | to the classes listing — booking always requires a POST.
+        */
+        Route::get('/classes',                  [BookingController::class, 'create'])->name('classes');
+        Route::get('/classes/book',             fn() => redirect()->route('member.classes'))->name('book.get'); // 405 guard
+        Route::post('/classes/book',            [BookingController::class, 'store'])->name('book');
+
+        // Cancel a booking (DELETE by ScheduledClass ID)
+        Route::delete('/bookings/{id}',         [BookingController::class, 'destroy'])->name('cancel-booking');
+
+        // Bookings list with optional ?filter=upcoming|past|all
+        Route::get('/bookings',                 [BookingController::class, 'index'])->name('bookings');
+        Route::get('/bookings/upcoming',        [BookingController::class, 'upcoming'])->name('bookings.upcoming');
+        Route::get('/bookings/past',            [BookingController::class, 'past'])->name('bookings.past');
+
+        // Receipts (member's own)
+        Route::get('/receipts',                 [BookingController::class, 'receipts'])->name('receipts');
+        Route::get('/receipts/{receiptId}',     [BookingController::class, 'receipt'])->name('receipt');
+
+        // Resend booking confirmation email
+        Route::post('/resend-confirmation/{scheduledClassId}', [BookingController::class, 'resendConfirmation'])->name('resend-confirmation');
+
+        // AJAX helpers
+        Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
+        Route::get('/statistics',               [BookingController::class, 'statistics'])->name('statistics');
+    });
+
+    /*
+    |======================================================================
+    | INSTRUCTOR ROUTES
+    |======================================================================
+    */
     Route::prefix('instructor')->name('instructor.')->middleware('role:instructor')->group(function () {
-        // Dashboard with full statistics
+
+        // Dashboard (inline — keeps all stats in one place)
         Route::get('/dashboard', function () {
             /** @var \App\Models\User $user */
             $user = Auth::user();
 
-            // Total number of unique clients who have booked any class
             $totalUniqueClients = ScheduledClass::where('instructor_id', $user->id)
                 ->with('members')
                 ->get()
@@ -186,37 +140,30 @@ Route::middleware('auth')->group(function () {
                 ->unique('id')
                 ->count();
 
-            // Total number of bookings across all classes
             $totalBookings = ScheduledClass::where('instructor_id', $user->id)
                 ->withCount('members')
                 ->get()
                 ->sum('members_count');
 
-            // Total number of classes
             $totalClasses = ScheduledClass::where('instructor_id', $user->id)->count();
 
-            // Upcoming classes count
             $upcomingClasses = ScheduledClass::where('instructor_id', $user->id)
                 ->where('date_time', '>', Carbon::now())
                 ->count();
 
-            // Past classes count
             $pastClasses = ScheduledClass::where('instructor_id', $user->id)
                 ->where('date_time', '<', Carbon::now())
                 ->count();
 
-            // Total students (including repeats)
             $totalStudents = ScheduledClass::where('instructor_id', $user->id)
                 ->withCount('members')
                 ->get()
                 ->sum('members_count');
 
-            // Calculate total earnings from receipts
-            $totalEarnings = Receipt::whereHas('scheduledClass', function($query) use ($user) {
-                $query->where('instructor_id', $user->id);
-            })->sum('amount');
+            $totalEarnings = Receipt::whereHas('scheduledClass', fn($q) =>
+                $q->where('instructor_id', $user->id)
+            )->sum('amount');
 
-            // Recent classes
             $recentClasses = ScheduledClass::where('instructor_id', $user->id)
                 ->with(['classType', 'instructor'])
                 ->withCount('members')
@@ -224,52 +171,119 @@ Route::middleware('auth')->group(function () {
                 ->take(5)
                 ->get();
 
-            // Top classes by bookings
             $topClasses = ScheduledClass::where('instructor_id', $user->id)
                 ->with('classType')
                 ->withCount('members')
-                ->orderBy('members_count', 'desc')
+                ->orderByDesc('members_count')
                 ->take(5)
                 ->get();
 
             return view('instructor.dashboard', compact(
-                'totalUniqueClients',
-                'totalBookings',
-                'totalClasses',
-                'upcomingClasses',
-                'pastClasses',
-                'totalStudents',
-                'totalEarnings',
-                'recentClasses',
-                'topClasses'
+                'totalUniqueClients', 'totalBookings', 'totalClasses',
+                'upcomingClasses', 'pastClasses', 'totalStudents',
+                'totalEarnings', 'recentClasses', 'topClasses'
             ));
         })->name('dashboard');
 
         // Upcoming classes
+        Route::get('/upcoming',                      [ScheduledClassController::class, 'index'])->name('upcoming');
+
+        // Create / store a class
+        Route::get('/classes/create',                [ScheduledClassController::class, 'create'])->name('create');
+        Route::post('/schedule',                     [ScheduledClassController::class, 'store'])->name('schedule.store');
+
+        // All instructor classes
+        Route::get('/classes',                       [ScheduledClassController::class, 'instructorClasses'])->name('classes');
+
+        // Individual schedule management
+        Route::get('/schedule/{scheduledClass}',     [ScheduledClassController::class, 'show'])->name('schedule.show');
+        Route::get('/schedule/{scheduledClass}/edit',[ScheduledClassController::class, 'edit'])->name('schedule.edit');
+        Route::put('/schedule/{scheduledClass}',     [ScheduledClassController::class, 'update'])->name('schedule.update');
+        Route::delete('/schedule/{scheduledClass}',  [ScheduledClassController::class, 'destroy'])->name('schedule.destroy');
+
+        // Earnings, calendar, stats
+        Route::get('/earnings',                      [EarningsController::class, 'instructorEarnings'])->name('earnings');
+        Route::get('/calendar',                      [ScheduledClassController::class, 'calendar'])->name('calendar');
+        Route::get('/statistics',                    [ScheduledClassController::class, 'statistics'])->name('statistics');
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Schedule resource (instructor middleware applied on resource)
+    |----------------------------------------------------------------------
+    */
+    Route::resource('schedule', ScheduledClassController::class)
+        ->parameters(['schedule' => 'scheduledClass'])
+        ->middleware('role:instructor');
+
+    Route::prefix('schedule')->name('schedule.')->middleware('role:instructor')->group(function () {
         Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
+        Route::get('/all',      [ScheduledClassController::class, 'instructorClasses'])->name('all');
+    });
 
-        // Create class
-        Route::get('/classes/create', [ScheduledClassController::class, 'create'])->name('create');
-        Route::post('/schedule', [ScheduledClassController::class, 'store'])->name('schedule.store');
+    /*
+    |======================================================================
+    | ADMIN ROUTES
+    |======================================================================
+    */
+    Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
 
-        // All classes
-        Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
+        Route::get('/',          [AdminController::class, 'dashboard'])->name('index');
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        // Members
+        Route::prefix('members')->name('members.')->group(function () {
+            Route::get('/',            [AdminController::class, 'members'])->name('index');
+            Route::get('/create',      [AdminController::class, 'createMember'])->name('create');
+            Route::post('/',           [AdminController::class, 'storeMember'])->name('store');
+            Route::get('/{id}/edit',   [AdminController::class, 'editMember'])->name('edit');
+            Route::put('/{id}',        [AdminController::class, 'updateMember'])->name('update');
+            Route::delete('/{id}',     [AdminController::class, 'destroyMember'])->name('destroy');
+        });
+
+        // Instructors
+        Route::prefix('instructors')->name('instructors.')->group(function () {
+            Route::get('/',            [AdminController::class, 'indexInstructors'])->name('index');
+            Route::get('/create',      [AdminController::class, 'createInstructor'])->name('create');
+            Route::post('/',           [AdminController::class, 'storeInstructor'])->name('store');
+            Route::get('/{id}/edit',   [AdminController::class, 'editInstructor'])->name('edit');
+            Route::put('/{id}',        [AdminController::class, 'updateInstructor'])->name('update');
+            Route::delete('/{id}',     [AdminController::class, 'destroyInstructor'])->name('destroy');
+            Route::get('/download-pdf',[AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
+        });
 
         // Earnings
-        Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
+        Route::prefix('earnings')->name('earnings.')->group(function () {
+            Route::get('/',                    [EarningsController::class, 'index'])->name('index');
+            Route::get('/data',                [EarningsController::class, 'earningsData'])->name('data');
+            Route::get('/all',                 [EarningsController::class, 'all'])->name('all');
+            Route::get('/transactions',        [EarningsController::class, 'allTransactions'])->name('transactions');
+            Route::get('/instructor-payout',   [EarningsController::class, 'instructorPayoutReport'])->name('instructor.payout');
+            Route::get('/export-pdf',          [EarningsController::class, 'exportPdf'])->name('export.pdf');
+            Route::get('/export-csv',          [EarningsController::class, 'exportCsv'])->name('export.csv');
+            Route::get('/export-excel',        [EarningsController::class, 'exportExcel'])->name('export.excel');
+        });
 
-        // Calendar
-        Route::get('/calendar', [ScheduledClassController::class, 'calendar'])->name('calendar');
+        // Reports
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/',                           [ReportsController::class, 'index'])->name('index');
+            Route::post('/generate',                  [ReportsController::class, 'generate'])->name('generate');
+            Route::get('/download-pdf',               [ReportsController::class, 'downloadPdf'])->name('download.pdf');
+            Route::get('/download-excel',             [ReportsController::class, 'downloadExcel'])->name('download.excel');
+            Route::get('/download-instructor-pdf',    [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
+        });
 
-        // Statistics API endpoint
-        Route::get('/statistics', [ScheduledClassController::class, 'statistics'])->name('statistics');
-
-        // Schedule management (CRUD)
-        Route::get('/schedule/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('schedule.show');
-        Route::get('/schedule/{scheduledClass}/edit', [ScheduledClassController::class, 'edit'])->name('schedule.edit');
-        Route::put('/schedule/{scheduledClass}', [ScheduledClassController::class, 'update'])->name('schedule.update');
-        Route::delete('/schedule/{scheduledClass}', [ScheduledClassController::class, 'destroy'])->name('schedule.destroy');
+        // Settings
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::get('/',           [SettingsController::class, 'index'])->name('index');
+            Route::post('/',          [SettingsController::class, 'update'])->name('update');
+            Route::post('/logo',      [SettingsController::class, 'updateLogo'])->name('logo');
+            Route::post('/favicon',   [SettingsController::class, 'updateFavicon'])->name('favicon');
+            Route::post('/reset',     [SettingsController::class, 'reset'])->name('reset');
+            Route::post('/clear-cache',[SettingsController::class, 'clearCache'])->name('clear-cache');
+        });
     });
+
 });
 
 require __DIR__.'/auth.php';

@@ -142,6 +142,22 @@ class User extends Authenticatable
             ->orderByDesc('date_time');
     }
 
+    /**
+     * Check if user has booked a specific class
+     */
+    public function hasBooked(ScheduledClass $class): bool
+    {
+        return $this->bookings()->where('scheduled_class_id', $class->id)->exists();
+    }
+
+    /**
+     * Get the booking record for a specific class
+     */
+    public function getBookingFor(ScheduledClass $class): ?Booking
+    {
+        return $this->bookings()->where('scheduled_class_id', $class->id)->first();
+    }
+
     // =========================================================================
     // Role checks
     // =========================================================================
@@ -220,5 +236,42 @@ class User extends Authenticatable
     public function scopeMembers($query)
     {
         return $query->where('role', 'member');
+    }
+
+    // =========================================================================
+    // Statistics
+    // =========================================================================
+
+    /**
+     * Get total amount spent by this user
+     */
+    public function getTotalSpentAttribute(): float
+    {
+        return (float) $this->receipts()->sum('amount');
+    }
+
+    /**
+     * Get total number of bookings
+     */
+    public function getTotalBookingsAttribute(): int
+    {
+        return $this->bookings()->count();
+    }
+
+    /**
+     * Get attendance rate percentage
+     */
+    public function getAttendanceRateAttribute(): int
+    {
+        $total = $this->bookings()->count();
+        if ($total === 0) {
+            return 0;
+        }
+
+        $completed = $this->bookings()
+            ->where('date_time', '<', now())
+            ->count();
+
+        return (int) round(($completed / $total) * 100);
     }
 }
