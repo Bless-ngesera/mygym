@@ -1,0 +1,18 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#8386
+    [34mid[39m: [35m1[39m,
+    [34mname[39m: [32m"[39m[32mBlessN[39m[32m"[39m,
+    [34memail[39m: [32m"[39m[32mbless@example.com[39m[32m"[39m,
+    [34memail_verified_at[39m: [36mnull[39m,
+    #[33mpassword[39m: [32m"[39m\$[32m2y[39m\$[32m12[39m\$[32mTY67a4HofGRcdfViB.yU4el6x32wACksCSY.5HOpO.qwX8WHw/eOO[39m[32m"[39m,
+    #[33mremember_token[39m: [32m"[39m[32moRbvHO2PSYaJFrFw5dMLLMBnl0FD3iH0KgTv5cVaE1V5Bc0hm5uI5csw5gQi[39m[32m"[39m,
+    [34mnotification_email[39m: [35m1[39m,
+    [34memail_frequency[39m: [32m"[39m[32mdaily[39m[32m"[39m,
+    [34mlanguage[39m: [32m"[39m[32men[39m[32m"[39m,
+    [34mtimezone[39m: [32m"[39m[32mUTC[39m[32m"[39m,
+    [34mtheme[39m: [32m"[39m[32msystem[39m[32m"[39m,
+    [34mlast_login_at[39m: [36mnull[39m,
+    [34mlast_login_ip[39m: [36mnull[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-03-30 13:27:31[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-03-30 23:24:42[39m[32m"[39m,
+    [34mrole[39m: [32m"[39m[32mmember[39m[32m"[39m,
+  }

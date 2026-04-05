@@ -1,90 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Welcome to MyGym</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome Instructor!</title>
     <style>
         body {
-            background-color: #eef2f7;
-            font-family: "Segoe UI", Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
             margin: 0;
             padding: 0;
-            color: #333;
         }
-        .card {
+        .container {
             max-width: 600px;
-            margin: 50px auto;
-            background: #fff;
+            margin: 20px auto;
+            background: white;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 40px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+            color: white;
+            padding: 30px;
             text-align: center;
         }
-        .card h1 {
-            font-size: 24px;
-            color: #4f46e5;
-            margin-bottom: 10px;
+        .content {
+            padding: 30px;
         }
-        .card h2 {
-            font-size: 20px;
-            margin: 0;
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 30px 0;
         }
-        .card p {
-            font-size: 16px;
-            line-height: 1.6;
-            margin: 20px 0;
-        }
-        .card ul {
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
-        }
-        .card ul li {
-            margin: 8px 0;
-            font-size: 15px;
+        .feature {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
         .button {
             display: inline-block;
-            margin-top: 25px;
-            padding: 12px 24px;
-            background-color: #4f46e5;
-            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             text-decoration: none;
+            padding: 12px 30px;
             border-radius: 6px;
-            font-weight: 600;
+            margin: 20px 0;
         }
         .footer {
-            margin-top: 40px;
-            font-size: 13px;
-            color: #777;
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>MyGym</h1>
-        <h2>Welcome to MyGym, Instructor {{ $instructor->name }} 🎉</h2>
+    <div class="container">
+        <div class="header">
+            <h1>🏋️ Welcome to MyGym!</h1>
+            <p>You're now part of our instructor team</p>
+        </div>
 
-        <p>We’re excited to have you join our team of instructors at <strong>MyGym</strong>.</p>
-        <p>You have been successfully registered as an instructor. You can now log in and start managing your classes, connecting with members, and sharing your expertise.</p>
+        <div class="content">
+            <h2>Hello {{ $instructor->name }}!</h2>
+            <p>Congratulations on becoming a MyGym instructor! We're thrilled to have you on board.</p>
 
-        <p>You can now:</p>
-        <ul>
-            <li>📅 Manage your class schedule</li>
-            <li>👥 Connect with members</li>
-            <li>📈 Track your instructor activity</li>
-            <li>💬 Share your expertise</li>
-        </ul>
+            <div class="features">
+                <div class="feature">
+                    <h3>📅 Schedule Classes</h3>
+                    <p>Create and manage your own class schedule</p>
+                </div>
+                <div class="feature">
+                    <h3>👥 Track Students</h3>
+                    <p>See who's attending your classes</p>
+                </div>
+                <div class="feature">
+                    <h3>💰 View Earnings</h3>
+                    <p>Track your earnings and payments</p>
+                </div>
+                <div class="feature">
+                    <h3>📊 Analytics</h3>
+                    <p>Monitor your class performance</p>
+                </div>
+            </div>
 
-        <a href="{{ route('login') }}" class="button">Log In to Your Account</a>
+            <div style="text-align: center;">
+                <a href="{{ route('instructor.dashboard') }}" class="button">Go to Dashboard</a>
+            </div>
 
+            <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                <p><strong>📝 Next Steps:</strong></p>
+                <ul>
+                    <li>Set up your profile</li>
+                    <li>Schedule your first class</li>
+                    <li>Review the instructor guidelines</li>
+                </ul>
+            </div>
+        </div>
 
-
-        <p class="footer">
-            Thanks,<br>
-            The MyGym Team<br><br>
-            &copy; {{ date('Y') }} MyGym. All rights reserved.
-        </p>
+        <div class="footer">
+            <p>&copy; {{ date('Y') }} MyGym. All rights reserved.</p>
+            <p>Need help? Contact us at instructors@mygym.com</p>
+        </div>
     </div>
 </body>
 </html>

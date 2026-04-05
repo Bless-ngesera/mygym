@@ -2,8 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Cancelled</title>
+    <title>Class Reminder</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,7 +21,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .header {
-            background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+            background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -30,13 +29,10 @@
         .content {
             padding: 30px;
         }
-        .button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 12px 30px;
-            border-radius: 6px;
+        .checklist {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 8px;
             margin: 20px 0;
         }
         .footer {
@@ -51,30 +47,35 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>❌ Class Cancelled</h1>
-            <p>Your class has been cancelled by the instructor</p>
+            <h1>⏰ Class Reminder</h1>
+            <p>Your class starts soon!</p>
         </div>
 
         <div class="content">
-            <h2>Hello {{ $booking->user->name }},</h2>
-            <p>We regret to inform you that the following class has been cancelled:</p>
+            <h2>Hello {{ $booking->user->name }}!</h2>
+            <p>This is a friendly reminder that your class starts in <strong>{{ $booking->scheduledClass->date_time->diffForHumans() }}</strong>.</p>
 
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Class:</strong> {{ $booking->scheduledClass->classType->name }}</p>
                 <p><strong>Date:</strong> {{ $booking->scheduledClass->date_time->format('l, F j, Y') }}</p>
                 <p><strong>Time:</strong> {{ $booking->scheduledClass->date_time->format('g:i A') }}</p>
+                <p><strong>Instructor:</strong> {{ $booking->scheduledClass->instructor->name ?? 'TBA' }}</p>
             </div>
 
-            <p>Your payment will be refunded within 5-7 business days. We apologize for any inconvenience.</p>
-
-            <div style="text-align: center;">
-                <a href="{{ route('member.classes') }}" class="button">Browse Other Classes</a>
+            <div class="checklist">
+                <p><strong>✅ Don't forget to bring:</strong></p>
+                <ul>
+                    <li>Comfortable workout clothes</li>
+                    <li>Water bottle</li>
+                    <li>Towel</li>
+                </ul>
             </div>
+
+            <p>See you at the gym! 💪</p>
         </div>
 
         <div class="footer">
             <p>&copy; {{ date('Y') }} MyGym. All rights reserved.</p>
-            <p>Questions? Contact us at support@mygym.com</p>
         </div>
     </div>
 </body>
