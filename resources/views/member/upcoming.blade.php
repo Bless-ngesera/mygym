@@ -3,11 +3,11 @@
         <div class="flex justify-between items-center">
             <div>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                    Upcoming Classes
+                    My Bookings
                 </h2>
                 <p class="text-sm text-gray-500 mt-1">Your scheduled fitness sessions</p>
             </div>
-            <a href="{{ route('classes.index') }}"
+            <a href="{{ route('member.classes') }}"
                class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                 Browse Classes
             </a>
@@ -40,6 +40,17 @@
             @endif
 
             {{-- Error Messages --}}
+            @if(session('error'))
+                <div id="errorMessage" class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl shadow-md">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                </div>
+            @endif
+
             @if($errors->any())
                 <div id="errorMessage" class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl shadow-md">
                     <div class="flex items-center mb-2">
@@ -56,9 +67,25 @@
                 </div>
             @endif
 
+            {{-- Tabs for filtering --}}
+            <div class="mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8">
+                        <a href="{{ route('member.bookings', ['filter' => 'upcoming']) }}"
+                           class="{{ request('filter', 'upcoming') == 'upcoming' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition">
+                            Upcoming Classes
+                        </a>
+                        <a href="{{ route('member.bookings', ['filter' => 'past']) }}"
+                           class="{{ request('filter') == 'past' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition">
+                            Past Classes
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
             {{-- Bookings Count --}}
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden p-4 mb-4 text-sm text-gray-500">
-                Showing <span class="font-semibold text-purple-600">{{ $bookings->total() ?? 0 }}</span> upcoming booking(s)
+                Showing <span class="font-semibold text-purple-600">{{ $bookings->total() ?? 0 }}</span> {{ request('filter', 'upcoming') }} booking(s)
             </div>
 
             <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden">
@@ -76,14 +103,18 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <h3 class="font-bold text-gray-900 text-lg">{{ $class->classType->name ?? 'Class' }}</h3>
-                                        <p class="text-xs text-gray-500">{{ $class->classType->minutes ?? 0 }} minutes</p>
+                                        <h3 class="font-bold text-gray-900 text-lg">{{ optional($class->classType)->name ?? 'Class' }}</h3>
+                                        <p class="text-xs text-gray-500">{{ optional($class->classType)->minutes ?? 0 }} minutes</p>
                                     </div>
                                 </div>
-                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Confirmed</span>
+                                @if($class->date_time && $class->date_time->isFuture())
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Confirmed</span>
+                                @else
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Completed</span>
+                                @endif
                             </div>
 
-                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">{{ $class->classType->description ?? 'No description available' }}</p>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">{{ optional($class->classType)->description ?? 'No description available' }}</p>
 
                             <div class="space-y-2 pt-3 border-t border-gray-100">
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
@@ -91,45 +122,47 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                     </svg>
                                     <span class="font-medium">Instructor:</span>
-                                    <span>{{ $class->instructor->name ?? 'TBA' }}</span>
+                                    <span>{{ optional($class->instructor)->name ?? 'TBA' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <span class="font-medium">Date:</span>
-                                    <span>{{ $class->date_time->format('l, M d, Y') }}</span>
+                                    <span>{{ $class->date_time ? $class->date_time->format('l, M d, Y') : 'TBA' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                     <span class="font-medium">Time:</span>
-                                    <span>{{ $class->date_time->format('h:i A') }}</span>
+                                    <span>{{ $class->date_time ? $class->date_time->format('h:i A') : 'TBA' }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 text-sm text-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                    <span class="font-medium">Price Paid:</span>
-                                    <span class="font-semibold text-emerald-600">UGX {{ number_format($class->pivot->amount ?? $class->price ?? 0, 0) }}</span>
+                                    <span class="font-medium">Price:</span>
+                                    <span class="font-semibold text-emerald-600">UGX {{ number_format($class->price ?? 0, 0) }}</span>
                                 </div>
                             </div>
 
-                            <div class="mt-4">
-                                <form method="POST" action="{{ route('bookings.destroy', $class->id) }}">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit"
-                                            onclick="return confirm('Are you sure you want to cancel this booking?')"
-                                            class="w-full px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-semibold transition-all duration-200 border border-red-200 flex items-center justify-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                        Cancel Booking
-                                    </button>
-                                </form>
-                            </div>
+                            {{-- Cancel Button - FIXED ROUTE NAME --}}
+                            @if($class->date_time && $class->date_time->isFuture())
+                                <div class="mt-4">
+                                    <form method="POST" action="{{ route('member.cancel-booking', $class->id) }}" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"
+                                                class="w-full px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-semibold transition-all duration-200 border border-red-200 flex items-center justify-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                            Cancel Booking
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
                         </div>
                         @empty
                         <div class="col-span-full text-center py-12">
@@ -138,9 +171,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
                             </div>
-                            <p class="text-gray-500 text-lg mb-2">No upcoming bookings</p>
-                            <p class="text-gray-400 text-sm mb-4">You haven't booked any classes yet.</p>
-                            <a href="{{ route('classes.index') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
+                            <p class="text-gray-500 text-lg mb-2">No {{ request('filter', 'upcoming') }} bookings</p>
+                            <p class="text-gray-400 text-sm mb-4">You haven't booked any {{ request('filter', 'upcoming') }} classes yet.</p>
+                            <a href="{{ route('member.classes') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                 </svg>
@@ -160,6 +193,7 @@
             </div>
         </div>
     </div>
+
     <footer class="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-purple-500/30">
         <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
@@ -194,7 +228,7 @@
                     <h5 class="text-lg font-semibold text-white mb-4">Quick Links</h5>
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Dashboard</a></li>
-                        <li><a href="{{ route('classes.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Browse Classes</a></li>
+                        <li><a href="{{ route('member.classes') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Browse Classes</a></li>
                         <li><a href="{{ route('member.bookings') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Manage Profile</a></li>
                     </ul>
@@ -239,7 +273,6 @@
             </div>
         </div>
     </footer>
-
 
     <style>
         @keyframes fadeIn {

@@ -139,11 +139,9 @@ class BookingController extends Controller
         try {
             DB::beginTransaction();
 
-            // Create the booking (attach the class to the user)
-            $user->bookings()->attach($class->id, [
-                'booked_at' => now(),
-                'status' => 'confirmed'
-            ]);
+            // FIXED: Create the booking WITHOUT extra columns (just attach the class)
+            // This works for a standard many-to-many pivot table with only user_id and scheduled_class_id
+            $user->bookings()->attach($class->id);
 
             // Generate unique receipt number
             $receiptNumber = 'RCP-' . strtoupper(uniqid()) . '-' . date('Ymd');
@@ -220,7 +218,7 @@ class BookingController extends Controller
             // Remove the booking
             $user->bookings()->detach($id);
 
-            // Optional: Delete or mark receipt as cancelled/refunded
+            // Mark receipt as cancelled/refunded
             $receipt = Receipt::where('user_id', $user->id)
                 ->where('scheduled_class_id', $id)
                 ->first();

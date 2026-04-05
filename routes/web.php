@@ -65,7 +65,7 @@ Route::middleware('auth')->group(function () {
 
     /*
     |----------------------------------------------------------------------
-    | Receipts  (shared — members AND admins can access)
+    | Receipts (shared — members AND admins can access)
     |----------------------------------------------------------------------
     */
     Route::prefix('receipts')->name('receipts.')->group(function () {
@@ -90,34 +90,28 @@ Route::middleware('auth')->group(function () {
 
         /*
         | Classes (browse & book)
-        |
-        | IMPORTANT: GET /member/classes/book must exist alongside POST.
-        | Without it, any browser reload / back-button on that URL throws
-        | 405 MethodNotAllowedHttpException. The GET simply redirects back
-        | to the classes listing — booking always requires a POST.
         */
-        Route::get('/classes',                  [BookingController::class, 'create'])->name('classes');
-        Route::get('/classes/book',             fn() => redirect()->route('member.classes'))->name('book.get'); // 405 guard
-        Route::post('/classes/book',            [BookingController::class, 'store'])->name('book');
+        Route::get('/classes', [BookingController::class, 'create'])->name('classes');
+        Route::post('/classes/book', [BookingController::class, 'store'])->name('book');
 
         // Cancel a booking (DELETE by ScheduledClass ID)
-        Route::delete('/bookings/{id}',         [BookingController::class, 'destroy'])->name('cancel-booking');
+        Route::delete('/bookings/{id}', [BookingController::class, 'destroy'])->name('cancel-booking');
 
-        // Bookings list with optional ?filter=upcoming|past|all
-        Route::get('/bookings',                 [BookingController::class, 'index'])->name('bookings');
-        Route::get('/bookings/upcoming',        [BookingController::class, 'upcoming'])->name('bookings.upcoming');
-        Route::get('/bookings/past',            [BookingController::class, 'past'])->name('bookings.past');
+        // Bookings list with optional ?filter=upcoming|past
+        Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
+        Route::get('/bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
+        Route::get('/bookings/past', [BookingController::class, 'past'])->name('bookings.past');
 
         // Receipts (member's own)
-        Route::get('/receipts',                 [BookingController::class, 'receipts'])->name('receipts');
-        Route::get('/receipts/{receiptId}',     [BookingController::class, 'receipt'])->name('receipt');
+        Route::get('/receipts', [BookingController::class, 'receipts'])->name('receipts');
+        Route::get('/receipts/{receiptId}', [BookingController::class, 'receipt'])->name('receipt');
 
         // Resend booking confirmation email
         Route::post('/resend-confirmation/{scheduledClassId}', [BookingController::class, 'resendConfirmation'])->name('resend-confirmation');
 
         // AJAX helpers
         Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
-        Route::get('/statistics',               [BookingController::class, 'statistics'])->name('statistics');
+        Route::get('/statistics', [BookingController::class, 'statistics'])->name('statistics');
     });
 
     /*
@@ -186,25 +180,25 @@ Route::middleware('auth')->group(function () {
         })->name('dashboard');
 
         // Upcoming classes
-        Route::get('/upcoming',                      [ScheduledClassController::class, 'index'])->name('upcoming');
+        Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
 
         // Create / store a class
-        Route::get('/classes/create',                [ScheduledClassController::class, 'create'])->name('create');
-        Route::post('/schedule',                     [ScheduledClassController::class, 'store'])->name('schedule.store');
+        Route::get('/classes/create', [ScheduledClassController::class, 'create'])->name('create');
+        Route::post('/schedule', [ScheduledClassController::class, 'store'])->name('schedule.store');
 
         // All instructor classes
-        Route::get('/classes',                       [ScheduledClassController::class, 'instructorClasses'])->name('classes');
+        Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
 
         // Individual schedule management
-        Route::get('/schedule/{scheduledClass}',     [ScheduledClassController::class, 'show'])->name('schedule.show');
-        Route::get('/schedule/{scheduledClass}/edit',[ScheduledClassController::class, 'edit'])->name('schedule.edit');
-        Route::put('/schedule/{scheduledClass}',     [ScheduledClassController::class, 'update'])->name('schedule.update');
-        Route::delete('/schedule/{scheduledClass}',  [ScheduledClassController::class, 'destroy'])->name('schedule.destroy');
+        Route::get('/schedule/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('schedule.show');
+        Route::get('/schedule/{scheduledClass}/edit', [ScheduledClassController::class, 'edit'])->name('schedule.edit');
+        Route::put('/schedule/{scheduledClass}', [ScheduledClassController::class, 'update'])->name('schedule.update');
+        Route::delete('/schedule/{scheduledClass}', [ScheduledClassController::class, 'destroy'])->name('schedule.destroy');
 
         // Earnings, calendar, stats
-        Route::get('/earnings',                      [EarningsController::class, 'instructorEarnings'])->name('earnings');
-        Route::get('/calendar',                      [ScheduledClassController::class, 'calendar'])->name('calendar');
-        Route::get('/statistics',                    [ScheduledClassController::class, 'statistics'])->name('statistics');
+        Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
+        Route::get('/calendar', [ScheduledClassController::class, 'calendar'])->name('calendar');
+        Route::get('/statistics', [ScheduledClassController::class, 'statistics'])->name('statistics');
     });
 
     /*
@@ -218,7 +212,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('schedule')->name('schedule.')->middleware('role:instructor')->group(function () {
         Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
-        Route::get('/all',      [ScheduledClassController::class, 'instructorClasses'])->name('all');
+        Route::get('/all', [ScheduledClassController::class, 'instructorClasses'])->name('all');
     });
 
     /*
@@ -228,59 +222,59 @@ Route::middleware('auth')->group(function () {
     */
     Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
 
-        Route::get('/',          [AdminController::class, 'dashboard'])->name('index');
+        Route::get('/', [AdminController::class, 'dashboard'])->name('index');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
         // Members
         Route::prefix('members')->name('members.')->group(function () {
-            Route::get('/',            [AdminController::class, 'members'])->name('index');
-            Route::get('/create',      [AdminController::class, 'createMember'])->name('create');
-            Route::post('/',           [AdminController::class, 'storeMember'])->name('store');
-            Route::get('/{id}/edit',   [AdminController::class, 'editMember'])->name('edit');
-            Route::put('/{id}',        [AdminController::class, 'updateMember'])->name('update');
-            Route::delete('/{id}',     [AdminController::class, 'destroyMember'])->name('destroy');
+            Route::get('/', [AdminController::class, 'members'])->name('index');
+            Route::get('/create', [AdminController::class, 'createMember'])->name('create');
+            Route::post('/', [AdminController::class, 'storeMember'])->name('store');
+            Route::get('/{id}/edit', [AdminController::class, 'editMember'])->name('edit');
+            Route::put('/{id}', [AdminController::class, 'updateMember'])->name('update');
+            Route::delete('/{id}', [AdminController::class, 'destroyMember'])->name('destroy');
         });
 
         // Instructors
         Route::prefix('instructors')->name('instructors.')->group(function () {
-            Route::get('/',            [AdminController::class, 'indexInstructors'])->name('index');
-            Route::get('/create',      [AdminController::class, 'createInstructor'])->name('create');
-            Route::post('/',           [AdminController::class, 'storeInstructor'])->name('store');
-            Route::get('/{id}/edit',   [AdminController::class, 'editInstructor'])->name('edit');
-            Route::put('/{id}',        [AdminController::class, 'updateInstructor'])->name('update');
-            Route::delete('/{id}',     [AdminController::class, 'destroyInstructor'])->name('destroy');
-            Route::get('/download-pdf',[AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
+            Route::get('/', [AdminController::class, 'indexInstructors'])->name('index');
+            Route::get('/create', [AdminController::class, 'createInstructor'])->name('create');
+            Route::post('/', [AdminController::class, 'storeInstructor'])->name('store');
+            Route::get('/{id}/edit', [AdminController::class, 'editInstructor'])->name('edit');
+            Route::put('/{id}', [AdminController::class, 'updateInstructor'])->name('update');
+            Route::delete('/{id}', [AdminController::class, 'destroyInstructor'])->name('destroy');
+            Route::get('/download-pdf', [AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
         });
 
         // Earnings
         Route::prefix('earnings')->name('earnings.')->group(function () {
-            Route::get('/',                    [EarningsController::class, 'index'])->name('index');
-            Route::get('/data',                [EarningsController::class, 'earningsData'])->name('data');
-            Route::get('/all',                 [EarningsController::class, 'all'])->name('all');
-            Route::get('/transactions',        [EarningsController::class, 'allTransactions'])->name('transactions');
-            Route::get('/instructor-payout',   [EarningsController::class, 'instructorPayoutReport'])->name('instructor.payout');
-            Route::get('/export-pdf',          [EarningsController::class, 'exportPdf'])->name('export.pdf');
-            Route::get('/export-csv',          [EarningsController::class, 'exportCsv'])->name('export.csv');
-            Route::get('/export-excel',        [EarningsController::class, 'exportExcel'])->name('export.excel');
+            Route::get('/', [EarningsController::class, 'index'])->name('index');
+            Route::get('/data', [EarningsController::class, 'earningsData'])->name('data');
+            Route::get('/all', [EarningsController::class, 'all'])->name('all');
+            Route::get('/transactions', [EarningsController::class, 'allTransactions'])->name('transactions');
+            Route::get('/instructor-payout', [EarningsController::class, 'instructorPayoutReport'])->name('instructor.payout');
+            Route::get('/export-pdf', [EarningsController::class, 'exportPdf'])->name('export.pdf');
+            Route::get('/export-csv', [EarningsController::class, 'exportCsv'])->name('export.csv');
+            Route::get('/export-excel', [EarningsController::class, 'exportExcel'])->name('export.excel');
         });
 
         // Reports
         Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/',                           [ReportsController::class, 'index'])->name('index');
-            Route::post('/generate',                  [ReportsController::class, 'generate'])->name('generate');
-            Route::get('/download-pdf',               [ReportsController::class, 'downloadPdf'])->name('download.pdf');
-            Route::get('/download-excel',             [ReportsController::class, 'downloadExcel'])->name('download.excel');
-            Route::get('/download-instructor-pdf',    [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
+            Route::get('/', [ReportsController::class, 'index'])->name('index');
+            Route::post('/generate', [ReportsController::class, 'generate'])->name('generate');
+            Route::get('/download-pdf', [ReportsController::class, 'downloadPdf'])->name('download.pdf');
+            Route::get('/download-excel', [ReportsController::class, 'downloadExcel'])->name('download.excel');
+            Route::get('/download-instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
         });
 
         // Settings
         Route::prefix('settings')->name('settings.')->group(function () {
-            Route::get('/',           [SettingsController::class, 'index'])->name('index');
-            Route::post('/',          [SettingsController::class, 'update'])->name('update');
-            Route::post('/logo',      [SettingsController::class, 'updateLogo'])->name('logo');
-            Route::post('/favicon',   [SettingsController::class, 'updateFavicon'])->name('favicon');
-            Route::post('/reset',     [SettingsController::class, 'reset'])->name('reset');
-            Route::post('/clear-cache',[SettingsController::class, 'clearCache'])->name('clear-cache');
+            Route::get('/', [SettingsController::class, 'index'])->name('index');
+            Route::post('/', [SettingsController::class, 'update'])->name('update');
+            Route::post('/logo', [SettingsController::class, 'updateLogo'])->name('logo');
+            Route::post('/favicon', [SettingsController::class, 'updateFavicon'])->name('favicon');
+            Route::post('/reset', [SettingsController::class, 'reset'])->name('reset');
+            Route::post('/clear-cache', [SettingsController::class, 'clearCache'])->name('clear-cache');
         });
     });
 
