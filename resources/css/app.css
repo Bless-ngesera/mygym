@@ -1,3 +1,282 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.dark ::-webkit-scrollbar-track {
+    background: #1f2937;
+    border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Selection color for dark mode */
+.dark ::selection {
+    background-color: rgba(139, 92, 246, 0.3);
+    color: #f3f4f6;
+}
+
+::selection {
+    background-color: rgba(139, 92, 246, 0.2);
+    color: #1f2937;
+}
+
+/* Smooth theme transitions */
+* {
+    transition-property: background-color, border-color, box-shadow, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* Prevent transitions on page load to avoid FOUC */
+.no-transition * {
+    transition: none !important;
+}
+
+/* Better focus styles for dark mode */
+.dark :focus {
+    outline-color: rgba(139, 92, 246, 0.5);
+    outline-offset: 2px;
+}
+
+/* Custom gradient backgrounds for dark mode */
+.dark .bg-gradient-to-r {
+    --tw-gradient-from: #1e1b4b;
+    --tw-gradient-to: #312e81;
+}
+
+/* Card hover effects for dark mode */
+.dark .hover\:shadow-xl:hover {
+    --tw-shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Input field styles for dark mode */
+.dark input,
+.dark textarea,
+.dark select {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #f3f4f6;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+    border-color: #8b5cf6;
+    outline: none;
+    ring-color: #8b5cf6;
+}
+
+/* Placeholder text for dark mode */
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: #6b7280;
+}
+
+/* Table styles for dark mode */
+.dark table {
+    background-color: #1f2937;
+}
+
+.dark td,
+.dark th {
+    border-color: #374151;
+}
+
+/* Modal styles for dark mode */
+.dark .modal-content,
+.dark [x-show] .bg-white {
+    background-color: #1f2937;
+    color: #f3f4f6;
+}
+
+/* Dropdown menu styles for dark mode */
+.dark .dropdown-menu {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+/* Notification styles for dark mode */
+.dark .notification-bell {
+    background-color: #1f2937;
+}
+
+/* Chart colors for dark mode */
+.dark .chart-container {
+    background-color: #1f2937;
+}
+
+/* Loading skeleton for dark mode */
+.dark .animate-pulse {
+    background-color: #374151;
+}
+
+/* Badge colors for dark mode */
+.dark .bg-green-100 {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+.dark .bg-red-100 {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.dark .bg-yellow-100 {
+    background-color: rgba(234, 179, 8, 0.2);
+    color: #facc15;
+}
+
+.dark .bg-blue-100 {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
+.dark .bg-purple-100 {
+    background-color: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+}
+
+.dark .bg-indigo-100 {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+
+.dark .bg-amber-100 {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.dark .bg-emerald-100 {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+
+/* Text colors for dark mode */
+.dark .text-gray-900 {
+    color: #f3f4f6;
+}
+
+.dark .text-gray-800 {
+    color: #e5e7eb;
+}
+
+.dark .text-gray-700 {
+    color: #d1d5db;
+}
+
+.dark .text-gray-600 {
+    color: #9ca3af;
+}
+
+.dark .text-gray-500 {
+    color: #6b7280;
+}
+
+/* Border colors for dark mode */
+.dark .border-gray-200 {
+    border-color: #374151;
+}
+
+.dark .border-gray-100 {
+    border-color: #1f2937;
+}
+
+/* Background colors for dark mode */
+.dark .bg-gray-50 {
+    background-color: #111827;
+}
+
+.dark .bg-gray-100 {
+    background-color: #1f2937;
+}
+
+/* Glassmorphism effects for dark mode */
+.dark .bg-white\/85 {
+    background-color: rgba(31, 41, 55, 0.85);
+}
+
+.dark .bg-white\/80 {
+    background-color: rgba(31, 41, 55, 0.8);
+}
+
+.dark .bg-white\/50 {
+    background-color: rgba(31, 41, 55, 0.5);
+}
+
+.dark .bg-black\/50 {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Ring effects for dark mode */
+.dark .ring-white\/30 {
+    --tw-ring-color: rgba(55, 65, 81, 0.3);
+}
+
+.dark .ring-white\/50 {
+    --tw-ring-color: rgba(55, 65, 81, 0.5);
+}
+
+/* Shadow effects for dark mode */
+.dark .shadow-lg {
+    --tw-shadow-color: rgba(0, 0, 0, 0.3);
+    --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-xl {
+    --tw-shadow-color: rgba(0, 0, 0, 0.4);
+    --tw-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Backdrop blur for dark mode */
+.dark .backdrop-blur-md {
+    backdrop-filter: blur(12px);
+}
+
+/* Chart.js specific dark mode styles */
+.dark canvas {
+    filter: brightness(0.9) contrast(1.1);
+}
+
+/* Toast/Alert messages for dark mode */
+.dark .alert-success {
+    background-color: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+.dark .alert-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.dark .alert-info {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #60a5fa;
+}
+
+/* Loading spinner for dark mode */
+.dark .loading-spinner {
+    border-color: #374151;
+    border-top-color: #8b5cf6;
+}
+
+/* Avatar placeholder for dark mode */
+.dark .avatar-placeholder {
+    background-color: #374151;
+    color: #9ca3af;
+}

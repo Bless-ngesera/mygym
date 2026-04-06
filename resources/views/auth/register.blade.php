@@ -139,7 +139,7 @@
                             required
                             autofocus
                             autocomplete="name"
-                            placeholder="John Doe" />
+                            placeholder="Blessing Ngesera" />
                     </div>
                 </div>
 
@@ -160,7 +160,7 @@
                             value="{{ old('email') }}"
                             required
                             autocomplete="username"
-                            placeholder="your@email.com" />
+                            placeholder="blessingngesera@email.com" />
                     </div>
                 </div>
 

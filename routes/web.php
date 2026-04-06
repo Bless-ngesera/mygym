@@ -10,6 +10,8 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ScheduledClassController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\MemberDashboardController;
+use App\Http\Controllers\Api\MemberDashboardApiController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
 use Illuminate\Support\Facades\Route;
@@ -85,11 +87,35 @@ Route::middleware('auth')->group(function () {
     */
     Route::prefix('member')->name('member.')->middleware('role:member')->group(function () {
 
-        // Dashboard
-        Route::get('/dashboard', fn() => view('member.dashboard'))->name('dashboard');
+        // ==================== MEMBER DASHBOARD (NEW PREMIUM DASHBOARD) ====================
+        Route::get('/dashboard', [MemberDashboardController::class, 'index'])->name('dashboard');
+
+        // Workout routes
+        Route::post('/workouts/{workout}/start', [MemberDashboardController::class, 'startWorkout'])->name('workouts.start');
+        Route::post('/workouts/{workout}/complete', [MemberDashboardController::class, 'completeWorkout'])->name('workouts.complete');
+        Route::post('/workout-exercises/{workoutExercise}/complete', [MemberDashboardController::class, 'completeExercise'])->name('workout-exercises.complete');
+
+        // Attendance routes
+        Route::post('/check-in', [MemberDashboardController::class, 'checkIn'])->name('check-in');
+        Route::post('/check-out', [MemberDashboardController::class, 'checkOut'])->name('check-out');
+
+        // Nutrition routes
+        Route::post('/nutrition', [MemberDashboardController::class, 'addNutrition'])->name('nutrition.store');
+
+        // Progress routes
+        Route::post('/progress', [MemberDashboardController::class, 'addProgress'])->name('progress.store');
+        Route::post('/goals', [MemberDashboardController::class, 'createGoal'])->name('goals.store');
+
+        // Notification routes
+        Route::post('/notifications/{notification}/read', [MemberDashboardController::class, 'markNotificationRead'])->name('notifications.read');
+        Route::post('/notifications/mark-all-read', [MemberDashboardController::class, 'markAllNotificationsRead'])->name('notifications.mark-all-read');
+
+        // Message routes
+        Route::post('/messages', [MemberDashboardController::class, 'sendMessage'])->name('messages.send');
+        Route::get('/messages/{userId}', [MemberDashboardController::class, 'getMessages'])->name('messages.get');
 
         /*
-        | Classes (browse & book)
+        | Classes (browse & book) - Existing booking functionality
         */
         Route::get('/classes', [BookingController::class, 'create'])->name('classes');
         Route::post('/classes/book', [BookingController::class, 'store'])->name('book');
@@ -112,6 +138,17 @@ Route::middleware('auth')->group(function () {
         // AJAX helpers
         Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
         Route::get('/statistics', [BookingController::class, 'statistics'])->name('statistics');
+    });
+
+    /*
+    |======================================================================
+    | API Routes for Member Dashboard
+    |======================================================================
+    */
+    Route::prefix('api/member')->middleware('role:member')->group(function () {
+        Route::get('/dashboard/stats', [MemberDashboardApiController::class, 'getStats']);
+        Route::get('/dashboard/weight-progress', [MemberDashboardApiController::class, 'getWeightProgress']);
+        Route::get('/dashboard/workout-frequency', [MemberDashboardApiController::class, 'getWorkoutFrequency']);
     });
 
     /*
