@@ -3,301 +3,132 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class AIController extends Controller
 {
     /**
-     * Chat with AI coach
+     * Handle AI chat requests
      */
     public function chat(Request $request)
     {
-        try {
-            $request->validate([
-                'message' => 'required|string|max:1000'
-            ]);
+        $request->validate([
+            'message' => 'required|string|max:500'
+        ]);
 
-            $message = $request->message;
-            $response = $this->getAIResponse($message);
+        $message = strtolower(trim($request->message));
+        $user = Auth::user();
 
-            return response()->json([
-                'success' => true,
-                'response' => $response
-            ]);
-        } catch (\Exception $e) {
-            Log::error('AI Chat error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Unable to process your request. Please try again.'
-            ], 500);
-        }
+        // Get personalized response based on user data
+        $reply = $this->getPersonalizedResponse($message, $user);
+
+        return response()->json([
+            'success' => true,
+            'reply' => $reply
+        ]);
     }
 
     /**
-     * Get suggested questions for users
+     * Get personalized AI response
      */
-    public function getSuggestions()
+    private function getPersonalizedResponse($message, $user)
     {
-        try {
-            $suggestions = [
-                "How can I improve my workout routine?",
-                "What should I eat before a workout?",
-                "Tips for staying motivated",
-                "Best exercises for weight loss",
-                "How to build muscle effectively?",
-                "What's a good warm-up routine?",
-                "How much water should I drink daily?",
-                "Benefits of strength training",
-                "How to prevent workout injuries?",
-                "Best time to exercise for weight loss"
-            ];
-
-            return response()->json([
-                'success' => true,
-                'suggestions' => $suggestions
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Get suggestions error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Unable to load suggestions'
-            ], 500);
-        }
-    }
-
-    /**
-     * Generate personalized workout plan
-     */
-    public function generateWorkoutPlan(Request $request)
-    {
-        try {
-            $request->validate([
-                'goal' => 'required|string|in:weight_loss,muscle_gain,endurance,general_fitness',
-                'days_per_week' => 'required|integer|min:1|max:7'
-            ]);
-
-            $plan = $this->getWorkoutPlan($request->goal, $request->days_per_week);
-
-            return response()->json([
-                'success' => true,
-                'plan' => $plan
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Generate workout plan error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Unable to generate workout plan'
-            ], 500);
-        }
-    }
-
-    /**
-     * Get nutrition advice based on goal
-     */
-    public function getNutritionAdvice(Request $request)
-    {
-        try {
-            $request->validate([
-                'goal' => 'required|string|in:weight_loss,muscle_gain,maintenance'
-            ]);
-
-            $advice = $this->getNutritionAdviceByGoal($request->goal);
-
-            return response()->json([
-                'success' => true,
-                'advice' => $advice
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Get nutrition advice error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Unable to get nutrition advice'
-            ], 500);
-        }
-    }
-
-    /**
-     * Get AI response based on user message
-     */
-    private function getAIResponse($message)
-    {
-        $msg = strtolower($message);
-
-        if (str_contains($msg, 'workout') || str_contains($msg, 'exercise')) {
-            return "💪 Great question! For optimal results, I recommend a mix of cardio and strength training. Try 3-4 strength sessions and 2-3 cardio sessions per week. Would you like a personalized workout plan?";
-        }
-
-        if (str_contains($msg, 'nutrition') || str_contains($msg, 'diet') || str_contains($msg, 'food') || str_contains($msg, 'eat')) {
-            return "🥗 Nutrition is key! Focus on whole foods: lean proteins, complex carbs, healthy fats, and plenty of vegetables. Aim for 1.6-2.2g of protein per kg of body weight. What specific nutrition advice are you looking for?";
-        }
-
-        if (str_contains($msg, 'motivation') || str_contains($msg, 'motivate') || str_contains($msg, 'discouraged')) {
-            return "🔥 Remember why you started! Every workout brings you one step closer to your goals. Set small achievable targets and celebrate every win. You've got this! 💪";
-        }
-
-        if (str_contains($msg, 'protein')) {
-            return "💪 Excellent protein sources include chicken, fish, eggs, Greek yogurt, lentils, beans, and tofu. Aim for 20-40g per meal distributed throughout the day for optimal muscle synthesis.";
-        }
-
-        if (str_contains($msg, 'weight loss') || str_contains($msg, 'lose weight')) {
-            return "🏋️ For weight loss, combine a calorie deficit with strength training to preserve muscle mass. Aim for 500-700 calorie deficit per day for sustainable loss of 0.5-1kg per week. Cardio helps, but don't skip the weights!";
-        }
-
-        if (str_contains($msg, 'muscle') || str_contains($msg, 'gain muscle') || str_contains($msg, 'build muscle')) {
-            return "💪 To build muscle, focus on progressive overload - gradually increase weight or reps over time. Eat in a slight calorie surplus with adequate protein (1.6-2.2g/kg body weight). Rest and recovery are just as important as training!";
-        }
-
-        if (str_contains($msg, 'cardio')) {
-            return "🏃 Cardio improves heart health and burns calories. Aim for 150 minutes of moderate or 75 minutes of vigorous cardio weekly. Try HIIT (High-Intensity Interval Training) for maximum efficiency in less time!";
-        }
-
-        if (str_contains($msg, 'stretch') || str_contains($msg, 'flexibility') || str_contains($msg, 'mobility')) {
-            return "🧘 Stretching improves flexibility and reduces injury risk. Hold each stretch for 15-30 seconds, never bounce. Try dynamic stretches before workouts and static stretches after. Yoga is excellent for overall flexibility!";
-        }
-
-        if (str_contains($msg, 'sleep') || str_contains($msg, 'rest')) {
-            return "😴 Sleep is crucial for recovery! Aim for 7-9 hours of quality sleep per night. Proper rest improves performance, reduces injury risk, and helps with weight management. Create a consistent sleep schedule.";
-        }
-
-        if (str_contains($msg, 'water') || str_contains($msg, 'hydration')) {
-            return "💧 Stay hydrated! Drink 2-3 liters of water daily, more if you exercise heavily. Water regulates body temperature, lubricates joints, and transports nutrients. Drink before, during, and after workouts.";
-        }
-
-        if (str_contains($msg, 'injury') || str_contains($msg, 'hurt') || str_contains($msg, 'pain')) {
-            return "⚠️ Listen to your body! If you're in pain, stop exercising and rest. Apply RICE (Rest, Ice, Compression, Elevation) for acute injuries. Always warm up properly and use correct form to prevent injuries. Consult a doctor for persistent pain.";
-        }
-
-        if (str_contains($msg, 'beginner') || str_contains($msg, 'start')) {
-            return "🌟 Welcome to your fitness journey! Start slow with 2-3 workouts per week. Focus on learning proper form before increasing intensity. Begin with full body workouts and gradually increase frequency. Consistency is more important than intensity!";
-        }
-
-        if (str_contains($msg, 'meal') || str_contains($msg, 'recipe')) {
-            return "🍽️ Healthy eating doesn't have to be boring! Try: Greek yogurt with berries, grilled chicken with quinoa and vegetables, salmon with sweet potato, or plant-based protein bowls. Meal prep on Sundays to stay on track!";
-        }
-
-        return "🤖 I'm your AI fitness coach! I can help with:\n\n• 💪 Workout plans & exercises\n• 🥗 Nutrition advice & meal ideas\n• 🔥 Motivation & goal setting\n• ⚖️ Weight loss or muscle building tips\n• 🧘 Recovery & injury prevention\n• 😴 Sleep & hydration guidance\n\nWhat would you like to know about your fitness journey today?";
-    }
-
-    /**
-     * Get workout plan based on goal and days per week
-     */
-    private function getWorkoutPlan($goal, $daysPerWeek)
-    {
-        $plans = [
-            'weight_loss' => [
-                'focus' => 'Calorie burning and metabolism boost',
-                'workouts' => [
-                    'Day 1' => 'Full body HIIT + 20 min cardio',
-                    'Day 2' => 'Upper body strength + 30 min cardio',
-                    'Day 3' => 'Lower body strength + 20 min cardio',
-                    'Day 4' => 'Active recovery (walking, light cardio)',
-                    'Day 5' => 'Full body circuit training',
-                    'Day 6' => 'Cardio focus (run, swim, cycle)',
-                    'Day 7' => 'Rest and recovery'
-                ]
-            ],
-            'muscle_gain' => [
-                'focus' => 'Progressive overload and strength building',
-                'workouts' => [
-                    'Day 1' => 'Chest and Triceps',
-                    'Day 2' => 'Back and Biceps',
-                    'Day 3' => 'Legs and Shoulders',
-                    'Day 4' => 'Rest',
-                    'Day 5' => 'Push Day (Chest, Shoulders, Triceps)',
-                    'Day 6' => 'Pull Day (Back, Biceps)',
-                    'Day 7' => 'Rest'
-                ]
-            ],
-            'endurance' => [
-                'focus' => 'Building stamina and cardiovascular health',
-                'workouts' => [
-                    'Day 1' => 'Long slow run (45-60 min)',
-                    'Day 2' => 'Strength training + 20 min cardio',
-                    'Day 3' => 'Interval training (HIIT)',
-                    'Day 4' => 'Cross-training (swim/cycle)',
-                    'Day 5' => 'Tempo run (30-40 min)',
-                    'Day 6' => 'Strength training',
-                    'Day 7' => 'Active recovery'
-                ]
-            ],
-            'general_fitness' => [
-                'focus' => 'Balanced approach for overall health',
-                'workouts' => [
-                    'Day 1' => 'Full body strength',
-                    'Day 2' => 'Cardio (30 min)',
-                    'Day 3' => 'Upper body + core',
-                    'Day 4' => 'Active recovery (yoga/stretching)',
-                    'Day 5' => 'Lower body + core',
-                    'Day 6' => 'HIIT or cardio',
-                    'Day 7' => 'Rest'
-                ]
-            ]
-        ];
-
-        $plan = $plans[$goal] ?? $plans['general_fitness'];
-
-        $customizedWorkouts = [];
-        for ($i = 1; $i <= $daysPerWeek; $i++) {
-            $dayKey = 'Day ' . $i;
-            if (isset($plan['workouts'][$dayKey])) {
-                $customizedWorkouts[$dayKey] = $plan['workouts'][$dayKey];
+        // Workout related queries
+        if (str_contains($message, 'workout') || str_contains($message, 'exercise') || str_contains($message, 'gym')) {
+            if (str_contains($message, 'beginner')) {
+                return "🏋️ For beginners, I recommend starting with:\n\n• 3x/week full-body workouts\n• Focus on compound exercises (squats, pushups, rows)\n• 20-30 minute sessions\n• Rest days between workouts\n\nWould you like a sample beginner routine, " . ($user->name ?? 'friend') . "?";
+            } elseif (str_contains($message, 'chest') || str_contains($message, 'push')) {
+                return "💪 Great chest workout:\n\n• Bench Press: 4x8-10\n• Incline Dumbbell: 3x10-12\n• Push-ups: 3x15\n• Chest Flyes: 3x12\n\nRemember to warm up properly!";
+            } elseif (str_contains($message, 'leg') || str_contains($message, 'squat')) {
+                return "🦵 Leg day essentials:\n\n• Squats: 4x8-10\n• Lunges: 3x12 each leg\n• Leg Press: 3x10-12\n• Calf Raises: 4x15\n\nDon't skip leg day! 💪";
+            } elseif (str_contains($message, 'back')) {
+                return "🔥 Back workout routine:\n\n• Pull-ups/Lat Pulldowns: 4x8-10\n• Barbell Rows: 3x10-12\n• Seated Cable Rows: 3x12\n• Deadlifts: 3x5\n\nBuild that V-taper!";
+            } elseif (str_contains($message, 'shoulder')) {
+                return "💪 Shoulder workout:\n\n• Overhead Press: 4x8-10\n• Lateral Raises: 3x12-15\n• Front Raises: 3x12\n• Face Pulls: 3x15\n\nBuild those boulder shoulders!";
+            } elseif (str_contains($message, 'arms') || str_contains($message, 'bicep') || str_contains($message, 'tricep')) {
+                return "💪 Arm day workout:\n\nBiceps:\n• Barbell Curls: 4x8-10\n• Dumbbell Curls: 3x10-12\n• Hammer Curls: 3x10\n\nTriceps:\n• Tricep Pushdowns: 4x10-12\n• Skull Crushers: 3x8-10\n• Dips: 3x12\n\nGet those guns! 💪";
+            } elseif (str_contains($message, 'abs') || str_contains($message, 'core')) {
+                return "🔥 Core strengthening:\n\n• Planks: 3x30-60 sec\n• Russian Twists: 3x15 each side\n• Leg Raises: 3x12\n• Bicycle Crunches: 3x20\n• Mountain Climbers: 3x30 sec\n\nConsistency is key for visible abs!";
+            } else {
+                return "💪 Here's a balanced weekly workout plan:\n\nMonday: Chest & Triceps\nTuesday: Back & Biceps\nWednesday: Legs & Core\nThursday: Shoulders & Cardio\nFriday: Full Body HIIT\nSaturday: Active Recovery\nSunday: Rest\n\nWant specific exercises for any day? Just ask!";
             }
         }
 
-        $plan['workouts'] = $customizedWorkouts;
-        $plan['days_per_week'] = $daysPerWeek;
-        $plan['recommendation'] = "For $daysPerWeek days per week, focus on compound exercises and consistency over intensity. Rest days are crucial for recovery!";
+        // Nutrition related queries
+        elseif (str_contains($message, 'nutrition') || str_contains($message, 'diet') || str_contains($message, 'food') || str_contains($message, 'meal') || str_contains($message, 'eat')) {
+            if (str_contains($message, 'breakfast')) {
+                return "🥣 Healthy breakfast ideas:\n\n• Greek yogurt with berries & granola\n• Oatmeal with banana & nuts\n• Protein smoothie with spinach\n• Eggs with avocado toast\n\nAim for 20-30g protein to start your day!";
+            } elseif (str_contains($message, 'lunch')) {
+                return "🥗 Nutritious lunch options:\n\n• Grilled chicken quinoa bowl\n• Tuna salad wrap\n• Lentil soup with whole grain bread\n• Salmon with roasted vegetables\n\nBalance protein, complex carbs, and veggies!";
+            } elseif (str_contains($message, 'dinner')) {
+                return "🍽️ Healthy dinner ideas:\n\n• Lean steak with sweet potato\n• Baked fish with brown rice\n• Turkey meatballs with zucchini noodles\n• Stir-fry tofu with vegetables\n\nEat 2-3 hours before bedtime!";
+            } elseif (str_contains($message, 'snack')) {
+                return "🍎 Smart snack choices:\n\n• Apple with peanut butter\n• Protein shake\n• Handful of almonds\n• Cottage cheese with berries\n• Hard-boiled eggs\n\nKeep snacks under 200 calories!";
+            } elseif (str_contains($message, 'protein')) {
+                return "🥩 Best protein sources:\n\n• Chicken breast (31g/100g)\n• Fish (20-25g/100g)\n• Eggs (6g each)\n• Greek yogurt (10g/100g)\n• Lentils (9g/100g)\n• Whey protein (20-25g/scoop)\n\nAim for 1.6-2.2g protein per kg body weight!";
+            } elseif (str_contains($message, 'vegan') || str_contains($message, 'vegetarian')) {
+                return "🌱 Plant-based protein sources:\n\n• Lentils & beans\n• Tofu & tempeh\n• Quinoa & chickpeas\n• Seitan & edamame\n• Nuts & seeds\n• Plant-based protein powder\n\nCombine different sources for complete protein!";
+            } else {
+                return "🥗 General nutrition tips:\n\n• Eat protein with every meal\n• Include colorful vegetables\n• Stay hydrated (2-3L water daily)\n• Limit processed foods\n• Don't skip meals\n• Track calories if weight is a goal\n\nWant specific meal plans or recipes? Let me know your goals!";
+            }
+        }
 
-        return $plan;
-    }
+        // Motivation related queries
+        elseif (str_contains($message, 'motivation') || str_contains($message, 'motivate') || str_contains($message, 'tired') || str_contains($message, 'give up') || str_contains($message, 'discouraged')) {
+            $motivationalQuotes = [
+                "🔥 Remember why you started! Every workout is progress, no matter how small.",
+                "💪 You're stronger than you think. The pain you feel today will be the strength you feel tomorrow.",
+                "🌟 Success isn't always about greatness. It's about consistency. Consistent hard work leads to success.",
+                "🏆 Your body can stand almost anything. It's your mind that you have to convince.",
+                "⚡ The only bad workout is the one that didn't happen. You've already won by showing up!"
+            ];
 
-    /**
-     * Get nutrition advice based on goal
-     */
-    private function getNutritionAdviceByGoal($goal)
-    {
-        $advice = [
-            'weight_loss' => [
-                'calorie_deficit' => '500-700 calories per day',
-                'protein' => '1.6-2.2g per kg of body weight',
-                'tips' => [
-                    'Eat more vegetables and lean proteins',
-                    'Stay hydrated (2-3 liters water daily)',
-                    'Avoid liquid calories (soda, juice, alcohol)',
-                    'Practice portion control',
-                    'Don\'t skip meals - eat every 3-4 hours',
-                    'Limit processed foods and added sugars',
-                    'Eat protein with every meal for satiety'
-                ]
-            ],
-            'muscle_gain' => [
-                'calorie_surplus' => '300-500 calories above maintenance',
-                'protein' => '1.6-2.2g per kg of body weight',
-                'tips' => [
-                    'Eat protein with every meal (20-40g)',
-                    'Complex carbs for energy (oats, rice, potatoes)',
-                    'Healthy fats for hormones (avocado, nuts, olive oil)',
-                    'Eat every 3-4 hours',
-                    'Post-workout nutrition within 2 hours',
-                    'Don\'t fear carbs - they fuel your workouts',
-                    'Consider protein shakes for convenience'
-                ]
-            ],
-            'maintenance' => [
-                'calories' => 'Maintenance level',
-                'protein' => '1.2-1.6g per kg of body weight',
-                'tips' => [
-                    'Balanced meals with all macronutrients',
-                    'Listen to hunger cues',
-                    'Eat whole foods 80% of the time',
-                    'Stay consistent with meal timing',
-                    'Allow flexible eating (80/20 rule)',
-                    'Monitor portion sizes',
-                    'Adjust based on activity level'
-                ]
-            ]
-        ];
+            $quote = $motivationalQuotes[array_rand($motivationalQuotes)];
 
-        return $advice[$goal] ?? $advice['maintenance'];
+            return $quote . "\n\nYou've got this, " . ($user->name ?? 'champion') . "! 💪 What specific goal are you working toward right now?";
+        }
+
+        // Progress related queries
+        elseif (str_contains($message, 'progress') || str_contains($message, 'track') || str_contains($message, 'measure') || str_contains($message, 'results')) {
+            return "📊 Track your progress effectively:\n\n• Take photos every 4 weeks\n• Measure weight weekly (same time/day)\n• Track workout weights/reps\n• Measure body parts monthly\n• Note how clothes fit\n• Track energy & mood levels\n• Celebrate non-scale victories!\n\nConsistency > Intensity! Want me to help you set up a tracking system?";
+        }
+
+        // Cardio related
+        elseif (str_contains($message, 'cardio') || str_contains($message, 'running') || str_contains($message, 'walk') || str_contains($message, 'jog')) {
+            return "🏃 Cardio recommendations:\n\n• Beginners: 20 min walking/jogging\n• Intermediate: HIIT 15-20 min\n• Advanced: 45 min running\n• Low impact: Swimming/cycling\n• Fat burning: Fasted morning walk\n\nAim for 150 min moderate or 75 min intense cardio weekly!\n\nWhat's your current fitness level?";
+        }
+
+        // Recovery related
+        elseif (str_contains($message, 'recovery') || str_contains($message, 'rest') || str_contains($message, 'sleep') || str_contains($message, 'sore')) {
+            return "😴 Recovery is crucial! Tips:\n\n• Get 7-9 hours quality sleep\n• Take rest days seriously\n• Stretch dynamically before, statically after\n• Foam roll sore muscles\n• Stay hydrated (add electrolytes)\n• Eat protein within 30 min post-workout\n• Try active recovery (light walking)\n\nYour muscles grow during rest, not during workouts!";
+        }
+
+        // Weight loss related
+        elseif (str_contains($message, 'weight loss') || str_contains($message, 'fat loss') || str_contains($message, 'lose weight')) {
+            return "🎯 For effective weight loss:\n\n• Calorie deficit (500-750 calories/day)\n• High protein intake (preserve muscle)\n• Strength training 3-4x/week\n• NEAT (non-exercise activity)\n• 8-10k steps daily\n• Sleep & stress management\n• Patience (1-2 lbs/week is healthy)\n\nWant a sample meal plan or workout routine for weight loss?";
+        }
+
+        // Muscle building related
+        elseif (str_contains($message, 'muscle') || str_contains($message, 'gain weight') || str_contains($message, 'bulk')) {
+            return "💪 For muscle building:\n\n• Calorie surplus (+300-500 calories)\n• 1.6-2.2g protein per kg body weight\n• Progressive overload in training\n• Compound lifts (squat, deadlift, bench)\n• 6-12 rep range for hypertrophy\n• 7-9 hours sleep for recovery\n• Consistency over perfection\n\nWhat's your current training experience?";
+        }
+
+        // Greetings
+        elseif (str_contains($message, 'hi') || str_contains($message, 'hello') || str_contains($message, 'hey') || str_contains($message, 'good morning') || str_contains($message, 'good evening')) {
+            $time = date('H');
+            $greeting = $time < 12 ? 'Good morning' : ($time < 18 ? 'Good afternoon' : 'Good evening');
+
+            return "👋 {$greeting}, " . ($user->name ?? 'friend') . "! I'm your AI fitness coach. \n\nHow can I help you today?\n\nAsk me about:\n• 💪 Workouts & exercises\n• 🥗 Nutrition & meal ideas\n• 🔥 Motivation & mindset\n• 📊 Progress tracking\n• 🏃 Cardio & recovery\n\nWhat's your fitness goal today?";
+        }
+
+        // Help
+        elseif (str_contains($message, 'help') || str_contains($message, 'what can you do') || str_contains($message, 'commands')) {
+            return "🤖 I can help you with:\n\n💪 WORKOUTS\n• \"Workout for chest\"\n• \"Beginner leg workout\"\n• \"Arm day routine\"\n\n🥗 NUTRITION\n• \"Healthy breakfast ideas\"\n• \"Best protein sources\"\n• \"Meal prep tips\"\n\n🔥 MOTIVATION\n• \"Need motivation\"\n• \"Feeling tired\"\n• \"Stay consistent\"\n\n📊 PROGRESS\n• \"How to track progress\"\n• \"Measure results\"\n\n🏃 CARDIO & RECOVERY\n• \"Cardio routine\"\n• \"Recovery tips\"\n\nWhat would you like to know?";
+        }
+
+        // Default response
+        else {
+            return "I'm here to help with your fitness journey, " . ($user->name ?? 'friend') . "! 💪\n\nYou can ask me about:\n• \"Workout for beginners\"\n• \"Healthy meal ideas\" \n• \"How to stay motivated\"\n• \"Track my progress\"\n• \"Cardio routine\"\n• \"Recovery tips\"\n\nWhat specific fitness goal can I help you with today?";
+        }
     }
 }

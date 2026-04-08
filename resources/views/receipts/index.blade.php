@@ -7,7 +7,7 @@
                 </h2>
                 <p class="text-sm text-gray-500 mt-1">View your payment history and receipts</p>
             </div>
-            <a href="{{ route('member.classes') }}"
+            <a href="{{ route('member.classes.index') }}"
                class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                 Browse Classes
             </a>

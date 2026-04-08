@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Register aliases for middleware (CRITICAL - includes 'auth' alias)
+        // Register aliases for middleware
         $middleware->alias([
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
@@ -38,7 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Global middleware (runs for every request)
-        $middleware->append([
+        $middleware->use([
+            \Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks::class,
             \Illuminate\Http\Middleware\TrustHosts::class,
             \Illuminate\Http\Middleware\TrustProxies::class,
             \Illuminate\Http\Middleware\HandleCors::class,
@@ -48,25 +49,37 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         ]);
 
-        // Web middleware group (add custom middleware)
+        // Web middleware group (standard Laravel web middleware)
         $middleware->web(append: [
             SetLocale::class,
+        ]);
+
+        // Ensure web group has all required middleware
+        $middleware->web(replace: [
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
         // API middleware group
         $middleware->api(prepend: [
             'throttle:api',
+        ]);
+
+        $middleware->api(append: [
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        // Priority middleware (order matters)
+        // Priority middleware (order matters - CSRF removed from priority as it's handled in web group)
         $middleware->priority([
             \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Illuminate\Auth\Middleware\Authenticate::class,
             \Illuminate\Auth\Middleware\Authorize::class,
@@ -107,6 +120,16 @@ return Application::configure(basePath: dirname(__DIR__))
                     'error' => 'You do not have permission to access this resource'
                 ], 403);
             }
+
+            // Don't redirect back if it's an API request
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden',
+                    'error' => 'You do not have permission to access this resource'
+                ], 403);
+            }
+
             return redirect()->back()->with('error', 'You do not have permission to access this resource.');
         });
 
@@ -118,16 +141,18 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Reportable exceptions
         $exceptions->reportable(function (Throwable $e) {
-            // Log all errors to laravel.log
-            \Illuminate\Support\Facades\Log::error('Exception: ' . $e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            // Only log non-validation exceptions
+            if (!$e instanceof \Illuminate\Validation\ValidationException) {
+                \Illuminate\Support\Facades\Log::error('Exception: ' . $e->getMessage(), [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
 
-            // Send to Sentry if configured (optional)
-            if (app()->bound('sentry') && !$e instanceof \Illuminate\Validation\ValidationException) {
-                app('sentry')->captureException($e);
+                // Send to Sentry if configured (optional)
+                if (app()->bound('sentry')) {
+                    app('sentry')->captureException($e);
+                }
             }
         });
 
@@ -138,7 +163,13 @@ return Application::configure(basePath: dirname(__DIR__))
             \Symfony\Component\HttpKernel\Exception\HttpException::class,
             \Illuminate\Database\Eloquent\ModelNotFoundException::class,
             \Illuminate\Validation\ValidationException::class,
+            \Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
         ]);
+
+        // Handle throttling exceptions gracefully
+        $exceptions->throttle(function (Throwable $e) {
+            return $e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException;
+        });
     })
     ->withSchedule(function (Schedule $schedule): void {
         // Send class reminders for classes in 2 hours (every 30 minutes)
@@ -167,12 +198,25 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->dailyAt('10:00')
                 ->withoutOverlapping();
 
-            // Clean up old session files (every hour)
+            // Clean up old session files (every hour) - only if using file driver
             $schedule->command('session:clean')
                 ->hourly()
                 ->withoutOverlapping();
 
             // Cache cleanup (every 6 hours)
+            $schedule->command('cache:prune-stale-tags')
+                ->everySixHours()
+                ->withoutOverlapping();
+
+            // Database backup (daily at 1 AM)
+            $schedule->command('backup:run --only-db')
+                ->dailyAt('01:00')
+                ->withoutOverlapping()
+                ->appendOutputTo(storage_path('logs/backup.log'));
+        }
+
+        // Run maintenance tasks in local environment too
+        if (app()->environment('local')) {
             $schedule->command('cache:prune-stale-tags')
                 ->everySixHours()
                 ->withoutOverlapping();
