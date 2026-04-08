@@ -7,7 +7,7 @@
                 </h2>
                 <p class="text-sm text-gray-500 mt-1">Browse and book fitness classes</p>
             </div>
-            <a href="{{ route('member.bookings') }}"
+            <a href="{{ route('member.bookings.index') }}"
                class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                 My Bookings
             </a>
@@ -182,7 +182,7 @@
 
     {{-- Payment Modal with Standard Form --}}
     <div id="paymentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
-        <form id="bookingForm" method="POST" action="{{ route('member.book') }}" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
+        <form id="bookingForm" method="POST" action="{{ route('member.classes.book') }}" class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
             @csrf
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold text-gray-900">Confirm Booking</h3>
@@ -268,7 +268,7 @@
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Dashboard</a></li>
                         <li><a href="{{ route('classes.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Browse Classes</a></li>
-                        <li><a href="{{ route('member.bookings') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
+                        <li><a href="{{ route('member.bookings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Manage Profile</a></li>
                     </ul>
                 </div>

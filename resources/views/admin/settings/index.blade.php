@@ -16,7 +16,10 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <!-- Header with Actions -->
             <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">Site Settings</h1>
+                <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden p-3">
+                    <h1 class="text-2xl font-bold text-gray-800">Site Settings</h1>
+                </div>
+
                 <div class="space-x-2">
                     <form action="{{ route('admin.settings.reset') }}" method="POST" class="inline">
                         @csrf

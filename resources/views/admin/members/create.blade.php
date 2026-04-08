@@ -281,7 +281,7 @@
                                                value="{{ old('name') }}"
                                                required
                                                class="w-full pl-10 pr-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition-all placeholder-gray-400"
-                                               placeholder="e.g., John Smith" />
+                                               placeholder="Blessing Ngesera" />
                                     </div>
                                 </div>
 
@@ -302,7 +302,7 @@
                                                value="{{ old('email') }}"
                                                required
                                                class="w-full pl-10 pr-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition-all placeholder-gray-400"
-                                               placeholder="e.g., john@example.com" />
+                                               placeholder="e.g., blessingngesera@example.com" />
                                     </div>
                                 </div>
 

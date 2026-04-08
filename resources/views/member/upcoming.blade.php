@@ -73,7 +73,7 @@
             {{-- Premium Filter Tabs --}}
             <div class="mb-6">
                 <div class="bg-white/80 backdrop-blur-sm rounded-xl p-1 inline-flex shadow-lg border border-white/40">
-                    <a href="{{ route('member.bookings', ['filter' => 'upcoming']) }}"
+                    <a href="{{ route('member.bookings.index', ['filter' => 'upcoming']) }}"
                        class="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 {{ request('filter', 'upcoming') == 'upcoming' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50' }}">
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +82,7 @@
                             Upcoming Classes
                         </div>
                     </a>
-                    <a href="{{ route('member.bookings', ['filter' => 'past']) }}"
+                    <a href="{{ route('member.bookings.index', ['filter' => 'past']) }}"
                        class="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 {{ request('filter') == 'past' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50' }}">
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,7 +205,7 @@
                             {{-- Cancel Button - Only for future classes --}}
                             @if($class->date_time && $class->date_time->isFuture())
                                 <div class="mt-4">
-                                    <form method="POST" action="{{ route('member.cancel-booking', $class->id) }}" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.');">
+                                    <form method="POST" action="{{ route('member.bookings.cancel', $class->id) }}" onsubmit="return confirm('Are you sure you want to cancel this booking? This action cannot be undone.');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit"
@@ -262,7 +262,7 @@
                                     Browse Available Classes
                                 </a>
                             @else
-                                <a href="{{ route('member.bookings', ['filter' => 'upcoming']) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
+                                <a href="{{ route('member.bookings.index', ['filter' => 'upcoming']) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                     </svg>

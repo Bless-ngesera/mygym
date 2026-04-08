@@ -289,7 +289,7 @@
                                            id="name"
                                            name="name"
                                            value="{{ old('name') }}"
-                                           placeholder="e.g., John Smith"
+                                           placeholder="e.g., Ezechias Muvunja"
                                            required
                                            class="w-full px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all placeholder-gray-400" />
                                 </div>
@@ -303,7 +303,7 @@
                                            id="email"
                                            name="email"
                                            value="{{ old('email') }}"
-                                           placeholder="e.g., john@example.com"
+                                           placeholder="e.g., ezechias.muvunja@example.com"
                                            required
                                            class="w-full px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all placeholder-gray-400" />
                                 </div>

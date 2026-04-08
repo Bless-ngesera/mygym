@@ -69,7 +69,7 @@
                 <a href="{{ route('instructor.calendar') }}" class="px-5 py-3 bg-blue-600 text-white font-semibold rounded-full shadow hover:scale-[1.02] transition">
                     📅 Calendar View
                 </a>
-                <a href="{{ route('instructor.earnings') }}" class="px-5 py-3 bg-yellow-500 text-white font-semibold rounded-full shadow hover:scale-[1.02] transition">
+                <a href="{{ route('instructor.earnings.index') }}" class="px-5 py-3 bg-yellow-500 text-white font-semibold rounded-full shadow hover:scale-[1.02] transition">
                     💵 My Earnings
                 </a>
             </div>

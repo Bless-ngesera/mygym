@@ -6,11 +6,15 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\EarningsController;
+use App\Http\Controllers\InstructorEarningsController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ScheduledClassController;
 use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MemberDashboardController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\Api\MemberDashboardApiController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
@@ -29,19 +33,34 @@ Route::get('/', fn() => view('welcome'))->name('home');
 // Public class listing (no auth required)
 Route::get('/classes', [ScheduledClassController::class, 'publicIndex'])->name('classes.index');
 
+// Language switcher route
+Route::get('/lang/{locale}', function ($locale) {
+    $supportedLocales = ['en', 'es', 'fr', 'de', 'it', 'pt', 'sw', 'ar'];
+    if (in_array($locale, $supportedLocales)) {
+        session()->put('locale', $locale);
+        app()->setLocale($locale);
+
+        // Update user preference if logged in
+        if (auth()->check()) {
+            auth()->user()->update(['language' => $locale]);
+        }
+    }
+    return redirect()->back();
+})->name('lang.switch');
+
 /*
 |--------------------------------------------------------------------------
 | Authenticated Routes
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth'])->group(function () {
 
     /*
     |----------------------------------------------------------------------
     | Shared Dashboard — redirects based on role
     |----------------------------------------------------------------------
     */
-    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     /*
     |----------------------------------------------------------------------
@@ -85,59 +104,121 @@ Route::middleware('auth')->group(function () {
     | MEMBER ROUTES
     |======================================================================
     */
-    Route::prefix('member')->name('member.')->middleware('role:member')->group(function () {
+    Route::prefix('member')->name('member.')->middleware(['role:member'])->group(function () {
 
-        // ==================== MEMBER DASHBOARD (NEW PREMIUM DASHBOARD) ====================
+        // ==================== MEMBER DASHBOARD ====================
         Route::get('/dashboard', [MemberDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/stats', [MemberDashboardController::class, 'getStats'])->name('dashboard.stats');
 
         // Workout routes
-        Route::post('/workouts/{workout}/start', [MemberDashboardController::class, 'startWorkout'])->name('workouts.start');
-        Route::post('/workouts/{workout}/complete', [MemberDashboardController::class, 'completeWorkout'])->name('workouts.complete');
+        Route::prefix('workouts')->name('workouts.')->group(function () {
+            Route::post('/{workout}/start', [MemberDashboardController::class, 'startWorkout'])->name('start');
+            Route::post('/{workout}/complete', [MemberDashboardController::class, 'completeWorkout'])->name('complete');
+            Route::get('/', [MemberDashboardController::class, 'workoutHistory'])->name('history');
+            Route::get('/upcoming', [MemberDashboardController::class, 'upcomingWorkouts'])->name('upcoming');
+            Route::get('/{workout}', [MemberDashboardController::class, 'showWorkout'])->name('show');
+        });
+
         Route::post('/workout-exercises/{workoutExercise}/complete', [MemberDashboardController::class, 'completeExercise'])->name('workout-exercises.complete');
 
         // Attendance routes
-        Route::post('/check-in', [MemberDashboardController::class, 'checkIn'])->name('check-in');
-        Route::post('/check-out', [MemberDashboardController::class, 'checkOut'])->name('check-out');
+        Route::prefix('attendance')->name('attendance.')->group(function () {
+            Route::post('/check-in', [MemberDashboardController::class, 'checkIn'])->name('check-in');
+            Route::post('/check-out', [MemberDashboardController::class, 'checkOut'])->name('check-out');
+            Route::get('/history', [MemberDashboardController::class, 'attendanceHistory'])->name('history');
+            Route::get('/current', [MemberDashboardController::class, 'currentAttendance'])->name('current');
+        });
 
         // Nutrition routes
-        Route::post('/nutrition', [MemberDashboardController::class, 'addNutrition'])->name('nutrition.store');
+        Route::prefix('nutrition')->name('nutrition.')->group(function () {
+            Route::post('/log', [MemberDashboardController::class, 'addNutrition'])->name('store');
+            Route::get('/today', [MemberDashboardController::class, 'getTodayNutrition'])->name('today');
+            Route::get('/history', [MemberDashboardController::class, 'nutritionHistory'])->name('history');
+            Route::delete('/{nutritionLog}', [MemberDashboardController::class, 'deleteNutrition'])->name('delete');
+        });
 
         // Progress routes
-        Route::post('/progress', [MemberDashboardController::class, 'addProgress'])->name('progress.store');
-        Route::post('/goals', [MemberDashboardController::class, 'createGoal'])->name('goals.store');
+        Route::prefix('progress')->name('progress.')->group(function () {
+            Route::post('/log', [MemberDashboardController::class, 'addProgress'])->name('store');
+            Route::get('/data', [MemberDashboardController::class, 'getProgressData'])->name('data');
+            Route::get('/chart-data', [MemberDashboardController::class, 'getProgressChartData'])->name('chart-data');
+        });
+
+        // Goals routes
+        Route::prefix('goals')->name('goals.')->group(function () {
+            Route::post('/create', [MemberDashboardController::class, 'createGoal'])->name('store');
+            Route::get('/', [MemberDashboardController::class, 'getGoals'])->name('index');
+            Route::put('/{goal}', [MemberDashboardController::class, 'updateGoal'])->name('update');
+            Route::delete('/{goal}', [MemberDashboardController::class, 'deleteGoal'])->name('delete');
+            Route::post('/{goal}/progress', [MemberDashboardController::class, 'updateGoalProgress'])->name('progress');
+        });
 
         // Notification routes
-        Route::post('/notifications/{notification}/read', [MemberDashboardController::class, 'markNotificationRead'])->name('notifications.read');
-        Route::post('/notifications/mark-all-read', [MemberDashboardController::class, 'markAllNotificationsRead'])->name('notifications.mark-all-read');
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::post('/{notification}/read', [MemberDashboardController::class, 'markNotificationRead'])->name('read');
+            Route::post('/mark-all-read', [MemberDashboardController::class, 'markAllNotificationsRead'])->name('mark-all-read');
+            Route::get('/', [MemberDashboardController::class, 'getNotifications'])->name('index');
+            Route::delete('/{notification}', [MemberDashboardController::class, 'deleteNotification'])->name('delete');
+        });
 
         // Message routes
-        Route::post('/messages', [MemberDashboardController::class, 'sendMessage'])->name('messages.send');
-        Route::get('/messages/{userId}', [MemberDashboardController::class, 'getMessages'])->name('messages.get');
+        Route::prefix('messages')->name('messages.')->group(function () {
+            Route::post('/send', [MemberDashboardController::class, 'sendMessage'])->name('send');
+            Route::get('/conversation/{userId}', [MemberDashboardController::class, 'getMessages'])->name('get');
+            Route::get('/conversations', [MemberDashboardController::class, 'getConversations'])->name('conversations');
+            Route::post('/{message}/read', [MemberDashboardController::class, 'markMessageAsRead'])->name('read');
+            Route::delete('/conversation/{userId}', [MemberDashboardController::class, 'deleteConversation'])->name('delete-conversation');
+            Route::get('/unread/count', [MemberDashboardController::class, 'getUnreadMessageCount'])->name('unread-count');
+        });
+
+        // AI Bot routes
+        Route::prefix('ai')->name('ai.')->group(function () {
+            Route::post('/chat', [AIController::class, 'chat'])->name('chat');
+            Route::get('/suggestions', [AIController::class, 'getSuggestions'])->name('suggestions');
+            Route::post('/workout-plan', [AIController::class, 'generateWorkoutPlan'])->name('workout-plan');
+            Route::post('/nutrition-advice', [AIController::class, 'getNutritionAdvice'])->name('nutrition-advice');
+            Route::post('/motivation', [AIController::class, 'getMotivation'])->name('motivation');
+        });
 
         /*
         | Classes (browse & book) - Existing booking functionality
         */
-        Route::get('/classes', [BookingController::class, 'create'])->name('classes');
-        Route::post('/classes/book', [BookingController::class, 'store'])->name('book');
+        Route::prefix('classes')->name('classes.')->group(function () {
+            Route::get('/', [BookingController::class, 'create'])->name('index');
+            Route::post('/book', [BookingController::class, 'store'])->name('book');
+            Route::get('/{classId}/availability', [BookingController::class, 'checkAvailability'])->name('availability');
+            Route::get('/{classId}', [BookingController::class, 'show'])->name('show');
+        });
 
-        // Cancel a booking (DELETE by ScheduledClass ID)
-        Route::delete('/bookings/{id}', [BookingController::class, 'destroy'])->name('cancel-booking');
+        // ALIAS: This allows using route('member.classes') for backward compatibility
+        Route::get('/browse-classes', [BookingController::class, 'create'])->name('classes');
 
-        // Bookings list with optional ?filter=upcoming|past
-        Route::get('/bookings', [BookingController::class, 'index'])->name('bookings');
-        Route::get('/bookings/upcoming', [BookingController::class, 'upcoming'])->name('bookings.upcoming');
-        Route::get('/bookings/past', [BookingController::class, 'past'])->name('bookings.past');
+        // Bookings
+        Route::prefix('bookings')->name('bookings.')->group(function () {
+            Route::delete('/{id}', [BookingController::class, 'destroy'])->name('cancel');
+            Route::get('/', [BookingController::class, 'index'])->name('index');
+            Route::get('/upcoming', [BookingController::class, 'upcoming'])->name('upcoming');
+            Route::get('/past', [BookingController::class, 'past'])->name('past');
+            Route::get('/{id}', [BookingController::class, 'show'])->name('show');
+            Route::post('/book', [BookingController::class, 'store'])->name('book');
+        });
 
         // Receipts (member's own)
-        Route::get('/receipts', [BookingController::class, 'receipts'])->name('receipts');
-        Route::get('/receipts/{receiptId}', [BookingController::class, 'receipt'])->name('receipt');
+        Route::prefix('receipts')->name('receipts.')->group(function () {
+            Route::get('/', [BookingController::class, 'receipts'])->name('index');
+            Route::get('/{receiptId}', [BookingController::class, 'receipt'])->name('show');
+            Route::get('/{receiptId}/download', [BookingController::class, 'downloadReceipt'])->name('download');
+        });
 
-        // Resend booking confirmation email
+        // Booking confirmation
         Route::post('/resend-confirmation/{scheduledClassId}', [BookingController::class, 'resendConfirmation'])->name('resend-confirmation');
 
-        // AJAX helpers
-        Route::get('/check-availability/{classId}', [BookingController::class, 'checkAvailability'])->name('check-availability');
+        // Statistics
         Route::get('/statistics', [BookingController::class, 'statistics'])->name('statistics');
+
+        // Export data
+        Route::get('/export/workouts', [MemberDashboardController::class, 'exportWorkouts'])->name('export.workouts');
+        Route::get('/export/progress', [MemberDashboardController::class, 'exportProgress'])->name('export.progress');
     });
 
     /*
@@ -145,10 +226,14 @@ Route::middleware('auth')->group(function () {
     | API Routes for Member Dashboard
     |======================================================================
     */
-    Route::prefix('api/member')->middleware('role:member')->group(function () {
+    Route::prefix('api/member')->middleware(['role:member'])->group(function () {
         Route::get('/dashboard/stats', [MemberDashboardApiController::class, 'getStats']);
         Route::get('/dashboard/weight-progress', [MemberDashboardApiController::class, 'getWeightProgress']);
         Route::get('/dashboard/workout-frequency', [MemberDashboardApiController::class, 'getWorkoutFrequency']);
+        Route::get('/dashboard/recent-activities', [MemberDashboardApiController::class, 'getRecentActivities']);
+        Route::get('/goals/progress', [MemberDashboardApiController::class, 'getGoalProgress']);
+        Route::get('/notifications/unread', [MemberDashboardApiController::class, 'getUnreadNotifications']);
+        Route::post('/messages/send', [MemberDashboardApiController::class, 'sendMessage']);
     });
 
     /*
@@ -156,9 +241,9 @@ Route::middleware('auth')->group(function () {
     | INSTRUCTOR ROUTES
     |======================================================================
     */
-    Route::prefix('instructor')->name('instructor.')->middleware('role:instructor')->group(function () {
+    Route::prefix('instructor')->name('instructor.')->middleware(['role:instructor'])->group(function () {
 
-        // Dashboard (inline — keeps all stats in one place)
+        // Dashboard
         Route::get('/dashboard', function () {
             /** @var \App\Models\User $user */
             $user = Auth::user();
@@ -216,6 +301,15 @@ Route::middleware('auth')->group(function () {
             ));
         })->name('dashboard');
 
+        // Instructor messaging routes
+        Route::prefix('messages')->name('messages.')->group(function () {
+            Route::get('/conversations', [MessageController::class, 'instructorConversations'])->name('conversations');
+            Route::get('/conversation/{userId}', [MessageController::class, 'getConversation'])->name('conversation');
+            Route::post('/send', [MessageController::class, 'sendMessage'])->name('send');
+            Route::post('/{message}/read', [MessageController::class, 'markAsRead'])->name('read');
+            Route::delete('/conversation/{userId}', [MessageController::class, 'deleteConversation'])->name('delete');
+        });
+
         // Upcoming classes
         Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
 
@@ -227,15 +321,36 @@ Route::middleware('auth')->group(function () {
         Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
 
         // Individual schedule management
-        Route::get('/schedule/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('schedule.show');
-        Route::get('/schedule/{scheduledClass}/edit', [ScheduledClassController::class, 'edit'])->name('schedule.edit');
-        Route::put('/schedule/{scheduledClass}', [ScheduledClassController::class, 'update'])->name('schedule.update');
-        Route::delete('/schedule/{scheduledClass}', [ScheduledClassController::class, 'destroy'])->name('schedule.destroy');
+        Route::prefix('schedule')->name('schedule.')->group(function () {
+            Route::get('/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('show');
+            Route::get('/{scheduledClass}/edit', [ScheduledClassController::class, 'edit'])->name('edit');
+            Route::put('/{scheduledClass}', [ScheduledClassController::class, 'update'])->name('update');
+            Route::delete('/{scheduledClass}', [ScheduledClassController::class, 'destroy'])->name('destroy');
+        });
 
-        // Earnings, calendar, stats
-        Route::get('/earnings', [EarningsController::class, 'instructorEarnings'])->name('earnings');
+        // ==================== EARNINGS ROUTES ====================
+        Route::prefix('earnings')->name('earnings.')->group(function () {
+            Route::get('/', [InstructorEarningsController::class, 'earnings'])->name('index');
+            Route::get('/export', [InstructorEarningsController::class, 'exportTransactions'])->name('export');
+            Route::get('/transactions', [InstructorEarningsController::class, 'getAllTransactions'])->name('transactions');
+            Route::get('/summary', [InstructorEarningsController::class, 'getEarningsSummary'])->name('summary');
+            Route::get('/payouts', [InstructorEarningsController::class, 'getPayoutHistory'])->name('payouts');
+        });
+
+        // Calendar and statistics
         Route::get('/calendar', [ScheduledClassController::class, 'calendar'])->name('calendar');
         Route::get('/statistics', [ScheduledClassController::class, 'statistics'])->name('statistics');
+
+        // Member management for instructors
+        Route::prefix('members')->name('members.')->group(function () {
+            Route::get('/', [ScheduledClassController::class, 'members'])->name('index');
+            Route::get('/{userId}/progress', [ScheduledClassController::class, 'memberProgress'])->name('progress');
+            Route::post('/{userId}/message', [ScheduledClassController::class, 'sendMessageToMember'])->name('send-message');
+        });
+
+        // Export routes
+        Route::get('/export/classes', [ScheduledClassController::class, 'exportClasses'])->name('export.classes');
+        Route::get('/export/earnings', [InstructorEarningsController::class, 'exportEarnings'])->name('export.earnings');
     });
 
     /*
@@ -245,11 +360,13 @@ Route::middleware('auth')->group(function () {
     */
     Route::resource('schedule', ScheduledClassController::class)
         ->parameters(['schedule' => 'scheduledClass'])
-        ->middleware('role:instructor');
+        ->middleware(['role:instructor']);
 
-    Route::prefix('schedule')->name('schedule.')->middleware('role:instructor')->group(function () {
+    Route::prefix('schedule')->name('schedule.')->middleware(['role:instructor'])->group(function () {
         Route::get('/upcoming', [ScheduledClassController::class, 'index'])->name('upcoming');
         Route::get('/all', [ScheduledClassController::class, 'instructorClasses'])->name('all');
+        Route::post('/{scheduledClass}/cancel', [ScheduledClassController::class, 'cancel'])->name('cancel');
+        Route::post('/{scheduledClass}/reschedule', [ScheduledClassController::class, 'reschedule'])->name('reschedule');
     });
 
     /*
@@ -257,7 +374,7 @@ Route::middleware('auth')->group(function () {
     | ADMIN ROUTES
     |======================================================================
     */
-    Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
+    Route::prefix('admin')->name('admin.')->middleware(['role:admin'])->group(function () {
 
         Route::get('/', [AdminController::class, 'dashboard'])->name('index');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -270,6 +387,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/{id}/edit', [AdminController::class, 'editMember'])->name('edit');
             Route::put('/{id}', [AdminController::class, 'updateMember'])->name('update');
             Route::delete('/{id}', [AdminController::class, 'destroyMember'])->name('destroy');
+            Route::post('/{id}/assign-instructor', [AdminController::class, 'assignInstructor'])->name('assign-instructor');
+            Route::get('/export', [AdminController::class, 'exportMembers'])->name('export');
+            Route::post('/bulk-delete', [AdminController::class, 'bulkDeleteMembers'])->name('bulk-delete');
         });
 
         // Instructors
@@ -281,6 +401,8 @@ Route::middleware('auth')->group(function () {
             Route::put('/{id}', [AdminController::class, 'updateInstructor'])->name('update');
             Route::delete('/{id}', [AdminController::class, 'destroyInstructor'])->name('destroy');
             Route::get('/download-pdf', [AdminController::class, 'downloadInstructorPdf'])->name('download.pdf');
+            Route::get('/{id}/members', [AdminController::class, 'instructorMembers'])->name('members');
+            Route::post('/{id}/toggle-status', [AdminController::class, 'toggleInstructorStatus'])->name('toggle-status');
         });
 
         // Earnings
@@ -293,6 +415,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/export-pdf', [EarningsController::class, 'exportPdf'])->name('export.pdf');
             Route::get('/export-csv', [EarningsController::class, 'exportCsv'])->name('export.csv');
             Route::get('/export-excel', [EarningsController::class, 'exportExcel'])->name('export.excel');
+            Route::post('/process-payouts', [EarningsController::class, 'processPayouts'])->name('process-payouts');
         });
 
         // Reports
@@ -302,6 +425,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/download-pdf', [ReportsController::class, 'downloadPdf'])->name('download.pdf');
             Route::get('/download-excel', [ReportsController::class, 'downloadExcel'])->name('download.excel');
             Route::get('/download-instructor-pdf', [ReportsController::class, 'downloadInstructorPdf'])->name('download.instructor.pdf');
+            Route::get('/members', [ReportsController::class, 'membersReport'])->name('members');
+            Route::get('/attendance', [ReportsController::class, 'attendanceReport'])->name('attendance');
+            Route::get('/financial', [ReportsController::class, 'financialReport'])->name('financial');
+            Route::get('/classes', [ReportsController::class, 'classesReport'])->name('classes');
         });
 
         // Settings
@@ -312,9 +439,41 @@ Route::middleware('auth')->group(function () {
             Route::post('/favicon', [SettingsController::class, 'updateFavicon'])->name('favicon');
             Route::post('/reset', [SettingsController::class, 'reset'])->name('reset');
             Route::post('/clear-cache', [SettingsController::class, 'clearCache'])->name('clear-cache');
+            Route::post('/backup', [SettingsController::class, 'createBackup'])->name('backup');
+            Route::get('/backups', [SettingsController::class, 'listBackups'])->name('backups');
+            Route::delete('/backups/{filename}', [SettingsController::class, 'deleteBackup'])->name('backups.delete');
+        });
+
+        // System health
+        Route::prefix('system')->name('system.')->group(function () {
+            Route::get('/health', [AdminController::class, 'systemHealth'])->name('health');
+            Route::get('/logs', [AdminController::class, 'systemLogs'])->name('logs');
+            Route::post('/cache/clear', [AdminController::class, 'clearSystemCache'])->name('clear-cache');
+            Route::get('/phpinfo', [AdminController::class, 'phpInfo'])->name('phpinfo');
+            Route::get('/queue-status', [AdminController::class, 'queueStatus'])->name('queue-status');
+            Route::post('/queue-restart', [AdminController::class, 'restartQueue'])->name('queue-restart');
+        });
+
+        // Database management
+        Route::prefix('database')->name('database.')->group(function () {
+            Route::get('/backup', [AdminController::class, 'databaseBackup'])->name('backup');
+            Route::post('/optimize', [AdminController::class, 'optimizeDatabase'])->name('optimize');
         });
     });
 
 });
 
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+*/
 require __DIR__.'/auth.php';
+
+// Fallback route for 404 errors (must be last)
+Route::fallback(function () {
+    if (request()->expectsJson()) {
+        return response()->json(['success' => false, 'message' => 'Resource not found'], 404);
+    }
+    return response()->view('errors.404', [], 404);
+})->name('fallback');

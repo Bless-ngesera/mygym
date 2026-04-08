@@ -216,7 +216,7 @@
 
                     {{-- Header Section --}}
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
+                        <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden p-4">
                             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Reports</h1>
                             <p class="text-sm text-gray-500 mt-1">Generate financial and membership reports</p>
                         </div>

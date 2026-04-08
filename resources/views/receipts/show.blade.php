@@ -8,7 +8,7 @@
                 <p class="text-sm text-gray-500 mt-1">{{ $receipt->reference_number }}</p>
             </div>
             <div class="flex gap-3">
-                <a href="{{ route('member.receipts') }}"
+                <a href="{{ route('receipts.index') }}"
                    class="no-print px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all duration-200">
                     ← Back to Receipts
                 </a>
@@ -233,7 +233,7 @@
                     <ul class="space-y-3">
                         <li><a href="{{ route('member.dashboard') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Dashboard</a></li>
                         <li><a href="{{ route('classes.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Browse Classes</a></li>
-                        <li><a href="{{ route('member.bookings') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
+                        <li><a href="{{ route('member.bookings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Manage Profile</a></li>
                     </ul>
                 </div>

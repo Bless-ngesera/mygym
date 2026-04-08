@@ -74,7 +74,7 @@
             @endif
 
             {{-- Classes Count --}}
-            <div class="mb-4 text-sm text-gray-500">
+            <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden p-4 mb-4">
                 Showing <span class="font-semibold text-purple-600">{{ $scheduledClasses->total() }}</span> upcoming class(es)
             </div>
 

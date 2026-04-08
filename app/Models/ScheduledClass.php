@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class ScheduledClass extends Model
 {
@@ -16,6 +17,8 @@ class ScheduledClass extends Model
     protected $casts = [
         'date_time' => 'datetime',
         'price'     => 'decimal:2',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // =========================================================================
@@ -45,7 +48,8 @@ class ScheduledClass extends Model
     public function members()
     {
         return $this->belongsToMany(User::class, 'bookings', 'scheduled_class_id', 'user_id')
-                    ->withTimestamps();
+                    ->withTimestamps()
+                    ->withPivot('created_at', 'status');
     }
 
     /**
@@ -53,7 +57,7 @@ class ScheduledClass extends Model
      */
     public function receipts()
     {
-        return $this->hasMany(Receipt::class);
+        return $this->hasMany(Receipt::class, 'scheduled_class_id');
     }
 
     /**
@@ -62,6 +66,14 @@ class ScheduledClass extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class, 'scheduled_class_id');
+    }
+
+    /**
+     * Bookings relationship
+     */
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'scheduled_class_id');
     }
 
     // =========================================================================
@@ -101,6 +113,15 @@ class ScheduledClass extends Model
     }
 
     /**
+     * Scope: this month's classes
+     */
+    public function scopeThisMonth(Builder $query): Builder
+    {
+        return $query->whereYear('date_time', now()->year)
+                     ->whereMonth('date_time', now()->month);
+    }
+
+    /**
      * Scope: exclude classes already booked by the current user
      */
     public function scopeNotBookedByUser(Builder $query): Builder
@@ -115,8 +136,25 @@ class ScheduledClass extends Model
     }
 
     /**
+     * Scope: classes for a specific instructor
+     */
+    public function scopeForInstructor(Builder $query, $instructorId): Builder
+    {
+        return $query->where('instructor_id', $instructorId);
+    }
+
+    /**
+     * Scope: classes with available spots
+     */
+    public function scopeWithAvailableSpots(Builder $query): Builder
+    {
+        return $query->whereHas('classType', function($q) {
+            $q->whereRaw('capacity > (SELECT COUNT(*) FROM bookings WHERE bookings.scheduled_class_id = scheduled_classes.id)');
+        });
+    }
+
+    /**
      * Scope: order by soonest date_time
-     * Named scopeSoonest to avoid overriding Laravel's built-in oldest() scope
      */
     public function scopeSoonest(Builder $query): Builder
     {
@@ -129,6 +167,14 @@ class ScheduledClass extends Model
     public function scopeLatest(Builder $query): Builder
     {
         return $query->orderBy('date_time', 'desc');
+    }
+
+    /**
+     * Scope: by date range
+     */
+    public function scopeDateBetween(Builder $query, $startDate, $endDate): Builder
+    {
+        return $query->whereBetween('date_time', [$startDate, $endDate]);
     }
 
     // =========================================================================
@@ -179,6 +225,16 @@ class ScheduledClass extends Model
     }
 
     /**
+     * Get the booking percentage
+     */
+    public function getBookingPercentageAttribute(): float
+    {
+        $capacity = $this->classType ? $this->classType->capacity : 999;
+        if ($capacity === 0) return 0;
+        return round(($this->members()->count() / $capacity) * 100, 2);
+    }
+
+    /**
      * Check if a specific user has booked this class
      */
     public function isBookedBy(User $user): bool
@@ -202,6 +258,16 @@ class ScheduledClass extends Model
     public function getTotalRevenueAttribute(): float
     {
         return (float) $this->receipts()->sum('amount');
+    }
+
+    /**
+     * Get total revenue for instructor from this class
+     */
+    public function getInstructorRevenueAttribute(): float
+    {
+        // Assuming instructor gets 70% of the revenue (adjust as needed)
+        $commissionRate = 0.70;
+        return $this->total_revenue * $commissionRate;
     }
 
     /**
@@ -252,6 +318,58 @@ class ScheduledClass extends Model
         return $this->date_time->format('l');
     }
 
+    /**
+     * Get duration in hours
+     */
+    public function getDurationHoursAttribute(): float
+    {
+        // Assuming duration is stored in minutes, adjust as needed
+        return $this->duration_minutes ?? 60 / 60;
+    }
+
+    /**
+     * Check if class can be cancelled
+     */
+    public function getCanCancelAttribute(): bool
+    {
+        // Can cancel if more than 2 hours before class starts
+        return $this->date_time->diffInHours(now()) >= 2;
+    }
+
+    /**
+     * Get status badge class
+     */
+    public function getStatusBadgeClassAttribute(): string
+    {
+        if ($this->isPast()) {
+            return 'bg-gray-100 text-gray-800';
+        }
+        if ($this->isFull()) {
+            return 'bg-red-100 text-red-800';
+        }
+        if ($this->isToday()) {
+            return 'bg-green-100 text-green-800';
+        }
+        return 'bg-blue-100 text-blue-800';
+    }
+
+    /**
+     * Get status label
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        if ($this->isPast()) {
+            return 'Completed';
+        }
+        if ($this->isFull()) {
+            return 'Full';
+        }
+        if ($this->isToday()) {
+            return 'Today';
+        }
+        return 'Available';
+    }
+
     // =========================================================================
     // Static Methods
     // =========================================================================
@@ -275,7 +393,105 @@ class ScheduledClass extends Model
         return self::upcoming()
             ->with(['classType', 'instructor'])
             ->notBookedByUser()
+            ->withAvailableSpots()
             ->soonest()
             ->paginate(12);
+    }
+
+    /**
+     * Get instructor's classes for a specific month
+     */
+    public static function getInstructorClassesForMonth($instructorId, $month, $year)
+    {
+        return self::forInstructor($instructorId)
+            ->whereYear('date_time', $year)
+            ->whereMonth('date_time', $month)
+            ->with(['classType', 'members'])
+            ->orderBy('date_time', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get earnings report for instructor
+     */
+    public static function getInstructorEarningsReport($instructorId, $startDate = null, $endDate = null)
+    {
+        $query = self::forInstructor($instructorId)
+            ->past()
+            ->with(['receipts', 'classType']);
+
+        if ($startDate && $endDate) {
+            $query->dateBetween($startDate, $endDate);
+        }
+
+        $classes = $query->get();
+
+        $totalRevenue = $classes->sum(function($class) {
+            return $class->total_revenue;
+        });
+
+        $instructorEarnings = $classes->sum(function($class) {
+            return $class->instructor_revenue;
+        });
+
+        $totalBookings = $classes->sum(function($class) {
+            return $class->bookings_count;
+        });
+
+        return [
+            'total_classes' => $classes->count(),
+            'total_revenue' => $totalRevenue,
+            'instructor_earnings' => $instructorEarnings,
+            'total_bookings' => $totalBookings,
+            'average_class_revenue' => $classes->count() > 0 ? $totalRevenue / $classes->count() : 0,
+            'classes' => $classes
+        ];
+    }
+
+    /**
+     * Get upcoming classes count for instructor
+     */
+    public static function getUpcomingCountForInstructor($instructorId)
+    {
+        return self::forInstructor($instructorId)
+            ->upcoming()
+            ->count();
+    }
+
+    /**
+     * Get popular classes (most booked)
+     */
+    public static function getPopularClasses($limit = 5)
+    {
+        return self::withCount('members')
+            ->orderByDesc('members_count')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get monthly class statistics
+     */
+    public static function getMonthlyStatistics($year = null, $month = null)
+    {
+        $year = $year ?? now()->year;
+        $month = $month ?? now()->month;
+
+        $classes = self::whereYear('date_time', $year)
+            ->whereMonth('date_time', $month)
+            ->get();
+
+        return [
+            'total_classes' => $classes->count(),
+            'total_bookings' => $classes->sum(function($class) {
+                return $class->bookings_count;
+            }),
+            'total_revenue' => $classes->sum(function($class) {
+                return $class->total_revenue;
+            }),
+            'average_attendance' => $classes->avg(function($class) {
+                return $class->booking_percentage;
+            }),
+        ];
     }
 }

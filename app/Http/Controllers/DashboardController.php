@@ -2,27 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    /**
-     * Handle the incoming request.
-     */
-    public function __invoke(Request $request)
+    public function index()
     {
-        switch ($request->user()->role) {
-            case 'admin':
-                return redirect()->route('admin.dashboard');
+        $user = Auth::user();
 
-            case 'instructor':
-                return redirect()->route('instructor.dashboard');
-
-            case 'member':
-                return redirect()->route('member.dashboard');
-
-            default:
-                return redirect()->route('login');
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
         }
+
+        if ($user->role === 'instructor') {
+            return redirect()->route('instructor.dashboard');
+        }
+
+        if ($user->role === 'member') {
+            return redirect()->route('member.dashboard');
+        }
+
+        return redirect()->route('login')->with('error', 'Invalid user role.');
     }
 }

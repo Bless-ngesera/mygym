@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+      :dir="isRTL ? 'rtl' : 'ltr'"
       x-data="{
           darkMode: localStorage.getItem('theme') === 'dark' ||
-                   (localStorage.getItem('theme') === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                   (localStorage.getItem('theme') === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches),
+          isRTL: {{ in_array(app()->getLocale(), ['ar', 'he', 'fa', 'ur']) ? 'true' : 'false' }},
+          openLocaleMenu: false
       }"
       x-init="() => {
           // Initialize theme from localStorage or system preference
@@ -30,10 +33,21 @@
           $watch('darkMode', (value) => {
               const currentTheme = localStorage.getItem('theme') || 'system';
               if (currentTheme === 'system') {
-                  // Don't store darkMode separately when in system mode
                   return;
               }
               document.documentElement.classList.toggle('dark', value);
+          });
+
+          // Watch for locale changes to update RTL
+          $watch('isRTL', (value) => {
+              document.documentElement.setAttribute('dir', value ? 'rtl' : 'ltr');
+          });
+
+          // Close locale menu when clicking outside
+          document.addEventListener('click', (e) => {
+              if (!e.target.closest('.locale-menu-container')) {
+                  openLocaleMenu = false;
+              }
           });
       }"
       :class="{ 'dark': darkMode }">
@@ -61,6 +75,21 @@
             /* Smooth theme transitions */
             * {
                 transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            /* RTL Support */
+            [dir="rtl"] {
+                text-align: right;
+            }
+
+            [dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
+                --tw-space-x-reverse: 1;
+                margin-right: calc(1rem * var(--tw-space-x-reverse));
+                margin-left: calc(1rem * calc(1 - var(--tw-space-x-reverse)));
+            }
+
+            [dir="rtl"] .flex-row {
+                flex-direction: row-reverse;
             }
         </style>
     </head>
