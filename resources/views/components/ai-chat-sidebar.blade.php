@@ -71,28 +71,6 @@
             </div>
         </div>
 
-        <!-- Chat History Side Panel -->
-        <div id="chatHistoryPanel" class="absolute inset-0 z-10 bg-gray-900/98 backdrop-blur-xl transform transition-all duration-300 -translate-x-full">
-            <div class="flex flex-col h-full">
-                <div class="p-4 border-b border-gray-800 flex justify-between items-center">
-                    <h4 class="font-semibold text-white">Chat History</h4>
-                    <button onclick="toggleChatHistory()" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div id="chatHistoryList" class="flex-1 overflow-y-auto p-3 space-y-2">
-                    <div class="text-center text-gray-500 py-8">Loading history...</div>
-                </div>
-                <div class="p-4 border-t border-gray-800">
-                    <button onclick="clearAllHistory()" class="w-full px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl text-sm transition">
-                        Clear All History
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Quick Suggestions Section with Toggle -->
         <div id="quickSuggestionsSection" class="px-5 py-3 border-b border-gray-800/50">
             <div class="flex items-center justify-between mb-3">
@@ -125,7 +103,7 @@
             </div>
         </div>
 
-        <!-- Chat Messages Area with Premium Styling -->
+        <!-- Chat Messages Area -->
         <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4" id="chatMessages" style="scroll-behavior: smooth;">
             <!-- Welcome Message -->
             <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
@@ -167,6 +145,28 @@
     </div>
 </div>
 
+<!-- Chat History Modal (Simple Dropdown Style) -->
+<div id="chatHistoryModal" class="fixed top-20 right-24 z-50 hidden w-80 bg-gray-900/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-800 transform transition-all duration-300 scale-95 opacity-0">
+    <div class="flex flex-col max-h-96">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+            <h4 class="font-semibold text-white">Chat History</h4>
+            <button onclick="closeHistoryModal()" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="chatHistoryList" class="flex-1 overflow-y-auto p-2 space-y-1 max-h-80">
+            <div class="text-center text-gray-500 py-8 text-sm">Loading history...</div>
+        </div>
+        <div class="p-3 border-t border-gray-800">
+            <button onclick="clearAllHistory()" class="w-full px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl text-xs transition">
+                Clear All History
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Premium Overlay -->
 <div id="chatOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-all duration-300"></div>
 
@@ -181,11 +181,6 @@
         to { transform: translateX(0); }
     }
 
-    @keyframes slideInLeft {
-        from { transform: translateX(-100%); }
-        to { transform: translateX(0); }
-    }
-
     @keyframes typingWave {
         0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
         30% { transform: translateY(-8px); opacity: 1; }
@@ -193,7 +188,6 @@
 
     .animate-fade-in { animation: fadeIn 0.3s ease-out; }
     .animate-slide-in { animation: slideIn 0.3s ease-out; }
-    .animate-slide-in-left { animation: slideInLeft 0.3s ease-out; }
 
     .typing-dot {
         animation: typingWave 1.2s infinite;
@@ -260,10 +254,23 @@
         overflow: hidden;
     }
 
+    /* Copy button animation */
+    .copy-btn {
+        transition: all 0.2s ease;
+    }
+
+    .copy-btn:hover {
+        transform: scale(1.1);
+    }
+
     /* Mobile full-screen adjustment */
     @media (max-width: 640px) {
         #aiChatSidebar {
             width: 100% !important;
+        }
+        #chatHistoryModal {
+            right: 16px !important;
+            width: calc(100% - 32px) !important;
         }
     }
 </style>
@@ -272,11 +279,11 @@
     // State management
     let isProcessing = false;
     let messageCount = 0;
-    let currentChatId = null;
+    let currentSessionId = null;
     let suggestionsVisible = true;
 
     // DOM Elements
-    let messagesContainer, chatInput, sendButton, charCountSpan, suggestionsContainer, suggestionsSection;
+    let messagesContainer, chatInput, sendButton, charCountSpan, suggestionsContainer;
 
     // Initialize DOM elements after page load
     function initElements() {
@@ -285,7 +292,6 @@
         sendButton = document.getElementById('sendButton');
         charCountSpan = document.getElementById('charCount');
         suggestionsContainer = document.getElementById('quickSuggestions');
-        suggestionsSection = document.getElementById('quickSuggestionsSection');
     }
 
     // Auto-resize textarea
@@ -319,15 +325,18 @@
         suggestionsVisible = !suggestionsVisible;
         const suggestionsDiv = document.getElementById('quickSuggestions');
         const toggleBtn = document.getElementById('toggleSuggestionsBtn');
+        const section = document.getElementById('quickSuggestionsSection');
 
         if (suggestionsVisible) {
             suggestionsDiv.classList.remove('suggestions-collapsed');
+            section.style.paddingBottom = '12px';
             toggleBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
             </svg>`;
             toggleBtn.title = "Hide suggestions";
         } else {
             suggestionsDiv.classList.add('suggestions-collapsed');
+            section.style.paddingBottom = '4px';
             toggleBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>`;
@@ -335,28 +344,54 @@
         }
     };
 
-    // Toggle chat history panel
-    window.toggleChatHistory = function() {
-        const panel = document.getElementById('chatHistoryPanel');
-        if (panel.classList.contains('-translate-x-full')) {
-            panel.classList.remove('-translate-x-full');
-            panel.classList.add('translate-x-0');
-            loadChatHistoryList();
+    // Auto-hide suggestions helper
+    function autoHideSuggestions() {
+        if (suggestionsVisible) {
+            toggleSuggestions();
+        }
+    }
+
+    // Show suggestions helper
+    function showSuggestions() {
+        if (!suggestionsVisible) {
+            toggleSuggestions();
+        }
+    }
+
+    // Open history modal
+    window.toggleChatHistory = async function() {
+        const modal = document.getElementById('chatHistoryModal');
+
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('scale-95', 'opacity-0');
+                modal.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            await loadChatHistoryList();
         } else {
-            panel.classList.remove('translate-x-0');
-            panel.classList.add('-translate-x-full');
+            closeHistoryModal();
         }
     };
 
-    // Load chat history list
+    function closeHistoryModal() {
+        const modal = document.getElementById('chatHistoryModal');
+        modal.classList.remove('scale-100', 'opacity-100');
+        modal.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    // Load chat sessions list
     async function loadChatHistoryList() {
         const container = document.getElementById('chatHistoryList');
         if (!container) return;
 
-        container.innerHTML = '<div class="text-center text-gray-500 py-8">Loading...</div>';
+        container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Loading sessions...</div>';
 
         try {
-            const response = await fetch('/chat/history-list', {
+            const response = await fetch('/chat/sessions', {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                     'Accept': 'application/json'
@@ -364,15 +399,16 @@
             });
             const data = await response.json();
 
-            if (data.success && data.history && data.history.length > 0) {
-                container.innerHTML = data.history.map(chat => `
-                    <div class="history-item p-3 rounded-xl cursor-pointer bg-gray-800/30 hover:bg-gray-800/50 transition-all" onclick="loadChatSession('${chat.id}')">
+            if (data.success && data.sessions && data.sessions.length > 0) {
+                container.innerHTML = data.sessions.map(session => `
+                    <div class="history-item p-3 rounded-xl cursor-pointer bg-gray-800/30 hover:bg-gray-800/50 transition-all" onclick="loadChatSession('${session.id}')">
                         <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <p class="text-sm text-white font-medium truncate">${escapeHtml(chat.preview || 'New Chat')}</p>
-                                <p class="text-xs text-gray-500 mt-1">${new Date(chat.updated_at).toLocaleDateString()} • ${chat.message_count || 0} messages</p>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm text-white font-medium truncate">${escapeHtml(session.title)}</p>
+                                <p class="text-xs text-gray-500 mt-1">${new Date(session.updated_at).toLocaleDateString()} • ${session.message_count || 0} messages</p>
+                                <p class="text-xs text-gray-400 truncate mt-1">${escapeHtml(session.preview)}</p>
                             </div>
-                            <button onclick="event.stopPropagation(); deleteChatSession('${chat.id}')" class="text-gray-500 hover:text-red-400 transition p-1">
+                            <button onclick="event.stopPropagation(); deleteChatSession('${session.id}')" class="text-gray-500 hover:text-red-400 transition p-1 ml-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                 </svg>
@@ -381,18 +417,18 @@
                     </div>
                 `).join('');
             } else {
-                container.innerHTML = '<div class="text-center text-gray-500 py-8">No chat history yet.<br>Start a conversation!</div>';
+                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">No chat sessions yet.<br>Start a conversation!</div>';
             }
         } catch (error) {
-            console.error('Error loading history:', error);
-            container.innerHTML = '<div class="text-center text-gray-500 py-8">Failed to load history</div>';
+            console.error('Error loading sessions:', error);
+            container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Failed to load sessions</div>';
         }
     }
 
     // Load specific chat session
-    window.loadChatSession = async function(chatId) {
+    window.loadChatSession = async function(sessionId) {
         try {
-            const response = await fetch(`/chat/session/${chatId}`, {
+            const response = await fetch(`/chat/session/${sessionId}`, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                     'Accept': 'application/json'
@@ -401,23 +437,28 @@
             const data = await response.json();
 
             if (data.success && messagesContainer) {
-                currentChatId = chatId;
-                // Clear current messages
+                currentSessionId = sessionId;
                 messagesContainer.innerHTML = '';
                 messageCount = 0;
 
-                // Load messages into chat
-                data.messages.forEach(msg => {
-                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false, msg.created_at);
-                    messageCount++;
-                });
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
+                        messageCount++;
+                    });
+                    updateMessageCount();
+                } else {
+                    addWelcomeMessage();
+                }
 
-                updateMessageCount();
                 scrollToBottom();
-
-                // Close history panel
-                toggleChatHistory();
+                closeHistoryModal();
                 showToast('Loaded conversation');
+
+                // Hide suggestions since chat has messages
+                if (suggestionsVisible) {
+                    toggleSuggestions();
+                }
             }
         } catch (error) {
             console.error('Error loading session:', error);
@@ -426,11 +467,11 @@
     };
 
     // Delete chat session
-    window.deleteChatSession = async function(chatId) {
+    window.deleteChatSession = async function(sessionId) {
         if (!confirm('Delete this conversation?')) return;
 
         try {
-            const response = await fetch(`/chat/session/${chatId}`, {
+            const response = await fetch(`/chat/session/${sessionId}`, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
@@ -440,8 +481,8 @@
             const data = await response.json();
 
             if (data.success) {
-                loadChatHistoryList();
-                if (currentChatId === chatId) {
+                await loadChatHistoryList();
+                if (currentSessionId === sessionId) {
                     startNewChat();
                 }
                 showToast('Conversation deleted');
@@ -454,39 +495,41 @@
 
     // Start new chat
     window.startNewChat = function() {
-        if (messagesContainer) {
-            // Clear messages but keep welcome message
-            const welcomeMsg = document.getElementById('welcomeMessage');
-            messagesContainer.innerHTML = '';
-            if (welcomeMsg) {
-                messagesContainer.appendChild(welcomeMsg.cloneNode(true));
-            } else {
-                // Recreate welcome message
-                messagesContainer.innerHTML = `
-                    <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
-                        <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
-                            <div class="flex items-center gap-2 mb-2">
-                                <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                    </svg>
-                                </div>
-                                <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
-                                <span class="text-xs text-gray-500">Online</span>
-                            </div>
-                            <p class="text-sm text-gray-200 leading-relaxed">✨ New conversation started! How can I help you today?</p>
-                            <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                    </div>
-                `;
-            }
-            currentChatId = null;
-            messageCount = 0;
-            updateMessageCount();
-            showToast('New conversation started');
-            if (chatInput) chatInput.focus();
+        addWelcomeMessage();
+        currentSessionId = null;
+        messageCount = 0;
+        updateMessageCount();
+        showToast('New conversation started');
+
+        // Show suggestions for new chat
+        if (!suggestionsVisible) {
+            showSuggestions();
         }
+
+        if (chatInput) chatInput.focus();
     };
+
+    function addWelcomeMessage() {
+        if (!messagesContainer) return;
+
+        messagesContainer.innerHTML = `
+            <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
+                <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                        <span class="text-xs text-gray-500">Online</span>
+                    </div>
+                    <p class="text-sm text-gray-200 leading-relaxed">✨ New conversation started! How can I help you today?</p>
+                    <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+            </div>
+        `;
+    }
 
     // Clear all history
     window.clearAllHistory = async function() {
@@ -503,8 +546,9 @@
 
                 if (data.success) {
                     startNewChat();
-                    loadChatHistoryList();
+                    await loadChatHistoryList();
                     showToast('All history cleared');
+                    closeHistoryModal();
                 }
             } catch (error) {
                 console.error('Error clearing history:', error);
@@ -513,10 +557,10 @@
         }
     };
 
-    // Load chat history (messages for current session)
-    async function loadChatHistory() {
+    // Load current session messages
+    async function loadCurrentSession() {
         try {
-            const response = await fetch('/chat/history', {
+            const response = await fetch('/chat/sessions/current', {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                     'Accept': 'application/json'
@@ -524,33 +568,44 @@
             });
             const data = await response.json();
 
-            if (data.success && data.history && data.history.length > 0 && messagesContainer) {
+            if (data.success && data.messages && data.messages.length > 0 && messagesContainer) {
                 const welcomeMsg = document.getElementById('welcomeMessage');
                 if (welcomeMsg) welcomeMsg.remove();
 
-                messageCount = data.history.length;
+                messageCount = data.messages.length;
                 updateMessageCount();
 
-                data.history.forEach(msg => {
-                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false, msg.created_at);
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
                 });
                 scrollToBottom();
+
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                }
+
+                // Hide suggestions if there are messages
+                if (messageCount > 0 && suggestionsVisible) {
+                    toggleSuggestions();
+                }
             }
         } catch (error) {
-            console.error('Error loading history:', error);
+            console.error('Error loading current session:', error);
         }
     }
 
     function updateMessageCount() {
         const countElement = document.getElementById('messageCount');
-        if (countElement) countElement.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''}`;
+        if (countElement) {
+            countElement.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''}`;
+        }
     }
 
     // Load quick suggestions
     async function loadSuggestions() {
         if (!suggestionsContainer) return;
 
-        suggestionsContainer.innerHTML = '<div class="flex gap-2"><div class="h-8 w-20 bg-gray-700 rounded-full animate-pulse"></div></div>';
+        suggestionsContainer.innerHTML = '<div class="flex gap-2"><div class="h-8 w-20 bg-gray-700 rounded-full animate-pulse"></div><div class="h-8 w-24 bg-gray-700 rounded-full animate-pulse"></div><div class="h-8 w-28 bg-gray-700 rounded-full animate-pulse"></div></div>';
 
         try {
             const response = await fetch('/chat/suggestions', {
@@ -562,9 +617,9 @@
             const data = await response.json();
 
             if (data.success && data.suggestions && data.suggestions.length > 0) {
-                suggestionsContainer.innerHTML = data.suggestions.slice(0, 8).map(suggestion => `
+                suggestionsContainer.innerHTML = data.suggestions.map(suggestion => `
                     <button onclick="window.useSuggestion('${escapeHtml(suggestion).replace(/'/g, "\\'")}')"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-800/80 backdrop-blur hover:bg-gray-700/80 text-gray-300 text-xs rounded-full transition-all duration-200 hover:scale-105 border border-gray-700 hover:border-purple-500/50">
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-800/80 backdrop-blur hover:bg-purple-600/30 text-gray-300 text-xs rounded-full transition-all duration-200 hover:scale-105 border border-gray-700 hover:border-purple-500/50">
                         <span>⚡</span>
                         ${escapeHtml(suggestion.length > 35 ? suggestion.substring(0, 35) + '...' : suggestion)}
                     </button>
@@ -584,9 +639,7 @@
 
     window.useSuggestion = function(suggestion) {
         // Auto-hide suggestions when a suggestion is used
-        if (suggestionsVisible) {
-            toggleSuggestions();
-        }
+        autoHideSuggestions();
 
         if (chatInput) {
             chatInput.value = suggestion;
@@ -615,9 +668,7 @@
         }
 
         // Auto-hide suggestions when user sends a message
-        if (suggestionsVisible) {
-            toggleSuggestions();
-        }
+        autoHideSuggestions();
 
         // Remove welcome message if present
         const welcomeMsg = document.getElementById('welcomeMessage');
@@ -650,7 +701,7 @@
                 },
                 body: JSON.stringify({
                     message: message,
-                    chat_id: currentChatId
+                    session_id: currentSessionId
                 })
             });
 
@@ -659,7 +710,7 @@
             hideTypingIndicator();
 
             if (data.success) {
-                currentChatId = data.chat_id;
+                currentSessionId = data.session_id;
                 await streamMessageToChat(data.message, 'ai');
                 messageCount++;
                 updateMessageCount();
@@ -799,7 +850,9 @@
         if (messageText) {
             const aiMessages = Array.from(messagesContainer.querySelectorAll('.justify-start'));
             if (aiMessages.length > 0) {
-                aiMessages[aiMessages.length - 1].remove();
+                const lastAiMessage = aiMessages[aiMessages.length - 1];
+                const messageId = lastAiMessage.querySelector('.action-buttons button')?.getAttribute('data-message-id');
+                lastAiMessage.remove();
                 messageCount--;
                 updateMessageCount();
             }
@@ -895,7 +948,7 @@
             }, 10);
 
             initElements();
-            loadChatHistory();
+            loadCurrentSession();
             loadSuggestions();
             setTimeout(() => {
                 if (chatInput) chatInput.focus();
@@ -918,6 +971,18 @@
         }
     };
 
+    // Close modal when clicking outside
+    document.addEventListener('click', function(event) {
+        const modal = document.getElementById('chatHistoryModal');
+        const historyBtn = event.target.closest('button[onclick*="toggleChatHistory"]');
+
+        if (modal && !modal.classList.contains('hidden')) {
+            if (!modal.contains(event.target) && !historyBtn) {
+                closeHistoryModal();
+            }
+        }
+    });
+
     // Close on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -925,6 +990,7 @@
             if (sidebar && !sidebar.classList.contains('hidden')) {
                 closeChat();
             }
+            closeHistoryModal();
         }
     });
 

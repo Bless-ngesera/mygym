@@ -123,6 +123,44 @@
             .dark ::-webkit-scrollbar-thumb:hover {
                 background: #9ca3af;
             }
+
+            /* Chat animations */
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes bounce {
+                0%, 60%, 100% {
+                    transform: translateY(0);
+                }
+                30% {
+                    transform: translateY(-8px);
+                }
+            }
+
+            .animate-fade-in {
+                animation: fadeIn 0.3s ease-out;
+            }
+
+            .animate-bounce {
+                animation: bounce 1.2s infinite;
+            }
+
+            /* Typing indicator dots */
+            .typing-dot {
+                animation: bounce 1.2s infinite;
+            }
+
+            .typing-dot:nth-child(1) { animation-delay: 0s; }
+            .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+            .typing-dot:nth-child(3) { animation-delay: 0.4s; }
         </style>
     </head>
 
@@ -150,10 +188,11 @@
 
         @stack('scripts')
 
-        {{-- Additional JavaScript for chat functionality --}}
+        {{-- Complete Chat JavaScript Functions --}}
         <script>
-            // Make sure openChat function is globally available
+            // Global chat functions
             window.openChat = function() {
+                console.log('Opening AI Assistant...');
                 const sidebar = document.getElementById('aiChatSidebar');
                 const overlay = document.getElementById('chatOverlay');
 
@@ -170,7 +209,12 @@
                     // Focus input after animation
                     setTimeout(() => {
                         const input = document.getElementById('chatInput');
-                        if (input) input.focus();
+                        if (input) {
+                            input.focus();
+                            // Place cursor at end of any existing text
+                            const length = input.value.length;
+                            input.setSelectionRange(length, length);
+                        }
                     }, 300);
                 } else {
                     console.error('Chat sidebar elements not found');
@@ -193,13 +237,178 @@
                 }
             };
 
-            // Close chat with Escape key
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    const sidebar = document.getElementById('aiChatSidebar');
-                    if (sidebar && !sidebar.classList.contains('hidden')) {
-                        closeChat();
+            // Send message function
+            window.sendChatMessage = async function() {
+                const input = document.getElementById('chatInput');
+                const message = input?.value.trim();
+
+                if (!message) return;
+
+                const messagesContainer = document.getElementById('chatMessages');
+                if (!messagesContainer) return;
+
+                // Add user message to chat
+                const userMessageDiv = document.createElement('div');
+                userMessageDiv.className = 'flex justify-end animate-fade-in';
+                userMessageDiv.innerHTML = `
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] shadow-lg">
+                        <p class="text-sm text-white leading-relaxed">${escapeHtml(message)}</p>
+                        <span class="text-xs text-purple-200 mt-1 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                `;
+                messagesContainer.appendChild(userMessageDiv);
+
+                // Clear input
+                input.value = '';
+                input.style.height = 'auto';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                // Show typing indicator
+                const typingDiv = document.createElement('div');
+                typingDiv.id = 'typingIndicator';
+                typingDiv.className = 'flex justify-start animate-fade-in';
+                typingDiv.innerHTML = `
+                    <div class="bg-gray-800 rounded-2xl rounded-tl-none px-4 py-3 border border-purple-500/20">
+                        <div class="flex gap-1.5">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot"></div>
+                            <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot"></div>
+                            <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot"></div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">AI is thinking...</p>
+                    </div>
+                `;
+                messagesContainer.appendChild(typingDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                try {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+                    const response = await fetch('/chat/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ message: message })
+                    });
+
+                    const data = await response.json();
+
+                    // Remove typing indicator
+                    document.getElementById('typingIndicator')?.remove();
+
+                    // Add AI response
+                    const aiMessageDiv = document.createElement('div');
+                    aiMessageDiv.className = 'flex justify-start animate-fade-in';
+                    aiMessageDiv.innerHTML = `
+                        <div class="bg-gray-800 rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] border border-purple-500/20 shadow-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-5 h-5 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                                <span class="text-xs text-gray-500">• Groq</span>
+                            </div>
+                            <p class="text-sm text-gray-200 leading-relaxed">${formatMessage(escapeHtml(data.message || 'Sorry, I encountered an error. Please try again.'))}</p>
+                            <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    `;
+                    messagesContainer.appendChild(aiMessageDiv);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                } catch (error) {
+                    console.error('Chat Error:', error);
+                    document.getElementById('typingIndicator')?.remove();
+
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'flex justify-start animate-fade-in';
+                    errorDiv.innerHTML = `
+                        <div class="bg-red-900/50 rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%] border border-red-500/20">
+                            <p class="text-sm text-red-200">⚠️ Sorry, I'm having trouble connecting. Please check your internet connection and try again.</p>
+                            <span class="text-xs text-red-300 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    `;
+                    messagesContainer.appendChild(errorDiv);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            };
+
+            // Use suggestion function
+            window.useSuggestion = function(suggestion) {
+                const input = document.getElementById('chatInput');
+                if (input) {
+                    input.value = suggestion;
+                    input.focus();
+                    // Auto-resize textarea
+                    input.style.height = 'auto';
+                    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+                    sendChatMessage();
+                }
+            };
+
+            // Helper functions
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatMessage(message) {
+                if (!message) return '';
+                let formatted = message;
+                // Bold text with ** **
+                formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>');
+                // Italic text with * *
+                formatted = formatted.replace(/\*(.*?)\*/g, '<em class="text-gray-300">$1</em>');
+                // Line breaks
+                formatted = formatted.replace(/\n/g, '<br>');
+                // Bullet points
+                formatted = formatted.replace(/• (.*?)(<br>|$)/g, '<li class="ml-4 list-disc">$1</li>');
+                return formatted;
+            }
+
+            // Auto-resize textarea
+            function autoResizeTextarea() {
+                const textarea = document.getElementById('chatInput');
+                if (textarea) {
+                    textarea.addEventListener('input', function() {
+                        this.style.height = 'auto';
+                        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                    });
+                }
+            }
+
+            // Enter key to send
+            document.addEventListener('DOMContentLoaded', function() {
+                const chatInput = document.getElementById('chatInput');
+                if (chatInput) {
+                    chatInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendChatMessage();
+                        }
+                    });
+                    autoResizeTextarea();
+                }
+
+                // Close chat with Escape key
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        const sidebar = document.getElementById('aiChatSidebar');
+                        if (sidebar && !sidebar.classList.contains('hidden')) {
+                            closeChat();
+                        }
                     }
+                });
+
+                // Close chat when clicking overlay
+                const overlay = document.getElementById('chatOverlay');
+                if (overlay) {
+                    overlay.addEventListener('click', closeChat);
                 }
             });
 

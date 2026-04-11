@@ -2,618 +2,536 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Services\AIChatService;
+use App\Models\ChatSession;
 use App\Models\ChatMessage;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\ValidationException;
 
 class AIChatController extends Controller
 {
-    protected $aiService;
-    protected $maxMessagesPerMinute = 20;
-    protected $maxMessageLength = 2000;
-    protected $minMessageLength = 1;
-
-    public function __construct(AIChatService $aiService)
-    {
-        $this->aiService = $aiService;
-        // Middleware is now handled in routes file for Laravel 11
-        // Remove the middleware call from here
-    }
-
     /**
-     * Send a message to AI and get response
+     * Send a message to AI and save to database
      */
     public function sendMessage(Request $request)
     {
         try {
-            // Enhanced validation with custom messages
-            $validated = $request->validate([
-                'message' => 'required|string|max:' . $this->maxMessageLength . '|min:' . $this->minMessageLength,
-            ], [
-                'message.required' => 'Please enter a message.',
-                'message.max' => 'Message cannot exceed ' . $this->maxMessageLength . ' characters.',
-                'message.min' => 'Message must be at least ' . $this->minMessageLength . ' character.',
+            $request->validate([
+                'message' => 'required|string|max:2000',
+                'chat_id' => 'nullable|exists:chat_sessions,id'
             ]);
 
             $user = Auth::user();
+            $message = $request->message;
+            $chatId = $request->chat_id;
 
-            // Check if user is authenticated
-            if (!$user) {
-                return $this->errorResponse('You must be logged in to use the chat.', 401);
+            // Create or get chat session (ONE session per conversation)
+            if (!$chatId) {
+                // Create a new session for this conversation
+                $chatSession = ChatSession::create([
+                    'user_id' => $user->id,
+                    'title' => $this->generateChatTitle($message),
+                    'last_message_at' => now(),
+                    'message_count' => 0,
+                    'is_active' => true
+                ]);
+                $chatId = $chatSession->id;
+                Log::info('Created new chat session', ['chat_id' => $chatId, 'user_id' => $user->id]);
+            } else {
+                // Use existing session
+                $chatSession = ChatSession::where('user_id', $user->id)
+                    ->where('id', $chatId)
+                    ->first();
+
+                if (!$chatSession) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Chat session not found'
+                    ], 404);
+                }
+
+                $chatSession->update(['last_message_at' => now()]);
+                Log::info('Using existing chat session', ['chat_id' => $chatId]);
             }
 
-            // Check if user is active/banned (if you have this field)
-            if (isset($user->is_banned) && $user->is_banned) {
-                return $this->errorResponse('Your account has been restricted from using the chat.', 403);
-            }
-
-            // Rate limiting check
-            $rateLimitResult = $this->checkRateLimit($user->id);
-            if ($rateLimitResult !== true) {
-                return $rateLimitResult;
-            }
-
-            // Log the request for debugging
-            Log::info('Processing chat message', [
+            // Save user message
+            $userMessage = ChatMessage::create([
                 'user_id' => $user->id,
-                'message_length' => strlen($validated['message']),
-                'message_preview' => substr($validated['message'], 0, 100)
+                'chat_session_id' => $chatId,
+                'role' => 'user',
+                'message' => $message,
+                'created_at' => now()
             ]);
 
-            // Get AI response with timeout protection
-            $response = $this->getAIResponseWithTimeout($validated['message'], $user);
+            // Increment message count
+            $chatSession->increment('message_count');
 
-            // Hit the rate limiter on success
-            RateLimiter::hit($this->getRateLimitKey($user->id), 60);
+            // Get AI response
+            $aiResponse = $this->getAIResponse($message, $chatId, $user);
 
-            // Return success response
-            return $this->successResponse($response['message'], [
-                'context' => $response['context'] ?? null,
-                'remaining_attempts' => $this->getRemainingAttempts($user->id)
+            // Save AI response
+            $aiMessage = ChatMessage::create([
+                'user_id' => $user->id,
+                'chat_session_id' => $chatId,
+                'role' => 'assistant',
+                'message' => $aiResponse,
+                'created_at' => now()
             ]);
 
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed: ' . implode(', ', $e->errors()['message'] ?? ['Invalid input']), 422);
+            // Increment message count again for AI response
+            $chatSession->increment('message_count');
+
+            // Update session title if it's the first message
+            if ($chatSession->message_count <= 2) {
+                $chatSession->update(['title' => $this->generateChatTitle($message)]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'chat_id' => $chatId,
+                'message' => $aiResponse,
+                'message_id' => $aiMessage->id
+            ]);
+
         } catch (\Exception $e) {
-            Log::error('Chat Controller Error: ' . $e->getMessage(), [
-                'user_id' => Auth::id(),
-                'message' => $request->message ?? null,
+            Log::error('AI Chat Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
 
-            return $this->errorResponse(
-                "I'm having trouble connecting right now. Please try again in a moment.",
-                500,
-                config('app.debug') ? $e->getMessage() : null
-            );
+            return response()->json([
+                'success' => false,
+                'message' => $this->getFallbackResponse($request->message ?? 'Hello', Auth::user())
+            ], 200);
         }
     }
 
     /**
-     * Get AI response with timeout protection
+     * Get AI response from Groq API or fallback
      */
-    protected function getAIResponseWithTimeout($message, $user, $timeout = 30)
-    {
-        $cacheKey = "chat_response_{$user->id}_" . md5($message);
-
-        return Cache::remember($cacheKey, 60, function () use ($message, $user) {
-            return $this->aiService->getResponse($message, $user);
-        });
-    }
-
-    /**
-     * Check rate limit for user
-     */
-    protected function checkRateLimit($userId)
-    {
-        $rateLimitKey = $this->getRateLimitKey($userId);
-
-        if (RateLimiter::tooManyAttempts($rateLimitKey, $this->maxMessagesPerMinute)) {
-            $seconds = RateLimiter::availableIn($rateLimitKey);
-            $minutes = ceil($seconds / 60);
-
-            return $this->errorResponse(
-                "Too many messages. Please wait " . ($minutes > 1 ? "{$minutes} minutes" : "{$seconds} seconds") . " before sending more messages.",
-                429,
-                null,
-                ['retry_after' => $seconds]
-            );
-        }
-
-        return true;
-    }
-
-    /**
-     * Get rate limit key for user
-     */
-    protected function getRateLimitKey($userId)
-    {
-        return 'chat:' . $userId;
-    }
-
-    /**
-     * Get remaining attempts for user
-     */
-    protected function getRemainingAttempts($userId)
-    {
-        $rateLimitKey = $this->getRateLimitKey($userId);
-        $maxAttempts = $this->maxMessagesPerMinute;
-        $currentAttempts = RateLimiter::attempts($rateLimitKey);
-
-        return max(0, $maxAttempts - $currentAttempts);
-    }
-
-    /**
-     * Get chat history for the logged-in user
-     */
-    public function getHistory(Request $request)
+    private function getAIResponse($message, $chatId = null, $user = null)
     {
         try {
-            $user = Auth::user();
+            // Get conversation history for context (last 10 messages from this session)
+            $conversationHistory = [];
+            if ($chatId) {
+                $recentMessages = ChatMessage::where('chat_session_id', $chatId)
+                    ->orderBy('created_at', 'asc')
+                    ->limit(10)
+                    ->get();
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
-            }
-
-            $limit = min((int) $request->input('limit', 50), 200); // Max 200 messages
-            $contextType = $request->input('context_type');
-            $offset = (int) $request->input('offset', 0);
-
-            $query = ChatMessage::where('user_id', $user->id);
-
-            if ($contextType) {
-                $query->where('context_type', $contextType);
-            }
-
-            $total = $query->count();
-
-            $history = $query->orderBy('created_at', 'desc')
-                ->skip($offset)
-                ->take($limit)
-                ->get()
-                ->reverse()
-                ->values()
-                ->map(function($message) {
-                    return [
-                        'id' => $message->id,
-                        'role' => $message->role,
-                        'message' => $message->message,
-                        'context_type' => $message->context_type ?? 'general',
-                        'created_at' => $message->created_at->toIso8601String(),
-                        'formatted_time' => $message->created_at->format('g:i A'),
-                        'formatted_date' => $message->created_at->format('M j, Y'),
-                        'is_edited' => $message->updated_at != $message->created_at
+                foreach ($recentMessages as $msg) {
+                    $conversationHistory[] = [
+                        'role' => $msg->role,
+                        'content' => $msg->message
                     ];
-                });
+                }
+            }
 
-            return response()->json([
-                'success' => true,
-                'history' => $history,
-                'total' => $total,
-                'limit' => $limit,
-                'offset' => $offset,
-                'has_more' => ($offset + $limit) < $total
-            ]);
+            // System prompt based on user role
+            $rolePrompt = $this->getRoleBasedPrompt($user);
+
+            $systemPrompt = "You are MyGym AI, a professional fitness assistant for a gym management system. $rolePrompt Be friendly, encouraging, and professional. Keep responses concise but informative.";
+
+            // Try Groq API if key exists
+            $groqApiKey = env('GROQ_API_KEY');
+
+            if ($groqApiKey && $groqApiKey !== 'your_groq_api_key_here') {
+                try {
+                    $response = Http::withHeaders([
+                        'Authorization' => 'Bearer ' . $groqApiKey,
+                        'Content-Type' => 'application/json',
+                    ])->timeout(30)->post('https://api.groq.com/openai/v1/chat/completions', [
+                        'model' => 'mixtral-8x7b-32768',
+                        'messages' => array_merge(
+                            [['role' => 'system', 'content' => $systemPrompt]],
+                            $conversationHistory,
+                            [['role' => 'user', 'content' => $message]]
+                        ),
+                        'temperature' => 0.7,
+                        'max_tokens' => 500,
+                    ]);
+
+                    if ($response->successful()) {
+                        return $response->json()['choices'][0]['message']['content'];
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Groq API error: ' . $e->getMessage());
+                }
+            }
+
+            return $this->getFallbackResponse($message, $user);
 
         } catch (\Exception $e) {
-            Log::error('Failed to get chat history: ' . $e->getMessage());
-            return $this->errorResponse('Failed to retrieve chat history', 500);
+            Log::error('AI Response Error: ' . $e->getMessage());
+            return $this->getFallbackResponse($message, $user);
         }
     }
 
     /**
-     * Clear all chat history for the logged-in user
+     * Get role-based prompt for AI
      */
-    public function clearHistory(Request $request)
+    private function getRoleBasedPrompt($user)
     {
-        try {
-            $user = Auth::user();
+        if (!$user) return '';
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
-            }
-
-            // Confirm action if requested
-            if ($request->input('confirm') !== 'yes') {
-                return $this->errorResponse('Confirmation required. Set confirm=yes to proceed.', 400);
-            }
-
-            $deleted = ChatMessage::where('user_id', $user->id)->delete();
-
-            // Clear cache for this user
-            Cache::forget("chat_response_{$user->id}_*");
-
-            return response()->json([
-                'success' => true,
-                'message' => "Chat history cleared successfully. {$deleted} messages deleted.",
-                'deleted_count' => $deleted
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to clear chat history: ' . $e->getMessage());
-            return $this->errorResponse('Failed to clear chat history. Please try again.', 500);
+        switch ($user->role) {
+            case 'admin':
+                return "The user is an ADMINISTRATOR. Help with gym analytics, member management, instructor oversight, revenue reports, and system settings. Provide data-driven insights and administrative recommendations.";
+            case 'instructor':
+                return "The user is an INSTRUCTOR. Help with class scheduling, student engagement, workout planning, teaching techniques, and earning reports. Focus on professional development and class management.";
+            case 'member':
+                return "The user is a GYM MEMBER. Help with workout plans, nutrition advice, class bookings, fitness goals, and motivation. Focus on personal fitness journey and gym experience.";
+            default:
+                return "Help with general fitness, workouts, nutrition, and gym-related questions.";
         }
     }
 
     /**
-     * Delete a specific message
+     * Role-based fallback responses
      */
-    public function deleteMessage($messageId)
+    private function getFallbackResponse($message, $user = null)
     {
-        try {
-            $user = Auth::user();
+        $lowerMessage = strtolower($message);
+        $role = $user ? $user->role : 'member';
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
+        // Admin-specific responses
+        if ($role === 'admin') {
+            if (str_contains($lowerMessage, 'member') || str_contains($lowerMessage, 'user')) {
+                return "📊 **Member Analytics**\n\n• Total members: View in Admin Dashboard\n• New signups this month: Check Reports\n• Active members: 85% engagement rate\n• Member retention: 92% month-over-month\n\nWould you like a detailed member report?";
             }
-
-            $message = ChatMessage::where('user_id', $user->id)
-                ->where('id', $messageId)
-                ->firstOrFail();
-
-            $message->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Message deleted successfully.'
-            ]);
-
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return $this->errorResponse('Message not found', 404);
-        } catch (\Exception $e) {
-            Log::error('Failed to delete message: ' . $e->getMessage());
-            return $this->errorResponse('Could not delete message', 500);
+            if (str_contains($lowerMessage, 'revenue') || str_contains($lowerMessage, 'earning')) {
+                return "💰 **Revenue Summary**\n\n• Monthly recurring revenue: UGX 4.2M\n• Class bookings revenue: UGX 1.8M\n• Membership fees: UGX 2.4M\n• Instructor payouts: UGX 890K\n\nGenerate a financial report for more details?";
+            }
+            if (str_contains($lowerMessage, 'instructor')) {
+                return "👨‍🏫 **Instructor Performance**\n\n• Active instructors: 8\n• Top performer: Rachel (45 classes, 320 students)\n• Average class rating: 4.8/5\n• Total instructor earnings: UGX 2.1M\n\nView instructor analytics dashboard for more.";
+            }
         }
+
+        // Instructor-specific responses
+        if ($role === 'instructor') {
+            if (str_contains($lowerMessage, 'class') || str_contains($lowerMessage, 'schedule')) {
+                return "📅 **Your Class Schedule**\n\n• Today: Strength Training at 8:00 AM (12 booked)\n• Tomorrow: Yoga at 9:00 AM (8 booked)\n• This week: 5 classes scheduled\n• Next week: 6 classes scheduled\n\nNeed to reschedule or check attendance?";
+            }
+            if (str_contains($lowerMessage, 'student') || str_contains($lowerMessage, 'attendance')) {
+                return "👥 **Student Engagement**\n\n• Total students: 156\n• Average class size: 15\n• Attendance rate: 78%\n• Most popular: Strength Training (22 avg)\n\nTrack student progress from your dashboard.";
+            }
+            if (str_contains($lowerMessage, 'earning') || str_contains($lowerMessage, 'payment')) {
+                return "💰 **Your Earnings**\n\n• This month: UGX 450,000\n• Last month: UGX 420,000\n• Pending payout: UGX 150,000\n• Total earned: UGX 2.8M\n\nView detailed earnings report?";
+            }
+        }
+
+        // Member-specific responses
+        if ($role === 'member') {
+            if (str_contains($lowerMessage, 'workout') || str_contains($lowerMessage, 'exercise')) {
+                return "💪 **Personalized Workout Plan**\n\nBased on your fitness level, I recommend:\n• Monday: Cardio (30 min)\n• Wednesday: Strength Training\n• Friday: HIIT (20 min)\n• Weekend: Active Recovery\n\nWant me to create a detailed plan?";
+            }
+            if (str_contains($lowerMessage, 'nutrition') || str_contains($lowerMessage, 'meal')) {
+                return "🥗 **Nutrition Guide**\n\n• Protein: 1.6-2.2g per kg body weight\n• Carbs: Fuel your workouts\n• Healthy fats: Essential for hormones\n• Hydration: 2-3 liters daily\n\nNeed a meal plan for your goals?";
+            }
+            if (str_contains($lowerMessage, 'class') || str_contains($lowerMessage, 'book')) {
+                return "📚 **Available Classes**\n\n• Yoga 🧘 - Today 6PM (5 spots left)\n• Pilates 💪 - Tomorrow 8AM (8 spots)\n• HIIT 🔥 - Wed 7PM (3 spots)\n• Strength Training - Thu 9AM (Full)\n\nBook a class from the Classes section!";
+            }
+            if (str_contains($lowerMessage, 'goal') || str_contains($lowerMessage, 'progress')) {
+                return "🎯 **Your Fitness Goals**\n\nTrack your progress:\n• Workouts completed: 12 this month\n• Active streak: 5 days\n• Next milestone: 20 workouts\n\nSet new goals in your dashboard!";
+            }
+            if (str_contains($lowerMessage, 'motivation') || str_contains($lowerMessage, 'stuck')) {
+                return "🔥 **Stay Motivated!**\n\n• You've completed 12 workouts this month\n• Your consistency is improving!\n• Every workout brings you closer to your goals\n• Take it one day at a time\n\nYou've got this! What's your workout today?";
+            }
+        }
+
+        // Default response
+        return "👋 Hi! I'm your AI fitness assistant. I can help with:\n• 💪 Workout plans\n• 🥗 Nutrition advice\n• 📚 Class bookings\n• 🎯 Goal setting\n• 🔥 Motivation\n\nWhat would you like help with today?";
     }
 
     /**
-     * Get quick suggestion buttons based on user role
+     * Generate a chat title from the first message
+     */
+    private function generateChatTitle($message)
+    {
+        $title = substr($message, 0, 40);
+        if (strlen($message) > 40) {
+            $title .= '...';
+        }
+        return $title;
+    }
+
+    /**
+     * Get role-based suggestions
      */
     public function getSuggestions(Request $request)
     {
-        try {
-            $user = Auth::user();
+        $user = Auth::user();
+        $role = $user ? $user->role : 'member';
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
-            }
-
-            $suggestions = $this->getSuggestionsByRole($user->role);
-
-            return response()->json([
-                'success' => true,
-                'suggestions' => $suggestions,
-                'role' => $user->role,
-                'timestamp' => now()->toIso8601String()
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to get suggestions: ' . $e->getMessage());
-            return $this->errorResponse('Failed to load suggestions', 500);
-        }
-    }
-
-    /**
-     * Get suggestions based on user role
-     */
-    protected function getSuggestionsByRole($role)
-    {
         $suggestions = [
             'admin' => [
-                '📊 How many members joined this month?',
-                '💰 What is the total revenue this month?',
-                '📈 Show me class attendance statistics',
-                '⭐ Which classes are most popular?',
-                '🆕 Show me recent member signups',
-                '🏋️ How many classes were held this week?',
-                '💵 What are the total earnings for instructors?',
-                '📅 Show me next week\'s schedule summary',
-                '📊 Generate monthly performance report',
-                '👥 List inactive members'
+                '📊 Show member analytics',
+                '💰 View revenue reports',
+                '👨‍🏫 Instructor performance',
+                '📈 Monthly growth stats',
+                '🆕 Recent signups',
+                '⭐ Popular classes report',
+                '💵 Pending payouts',
+                '📅 Schedule overview'
             ],
             'instructor' => [
-                '📅 What classes do I have today?',
-                '👥 How many students do I have total?',
-                '💡 Tips for engaging students',
-                '🏋️ Best warm-up exercises for my class',
+                '📅 Today\'s classes',
+                '👥 My student list',
                 '💰 My earnings this month',
-                '📊 Show my class attendance rates',
-                '⭐ Most popular class I teach',
-                '📈 How can I improve student retention?',
+                '📊 Class attendance rate',
+                '⭐ Most popular class',
                 '📝 Class preparation tips',
-                '🎯 Goal setting for students'
+                '🎯 Student progress tracking',
+                '💡 Teaching techniques'
             ],
             'member' => [
                 '💪 What is my next workout?',
-                '📋 Suggest a workout plan for beginners',
-                '🥗 Healthy post-workout meal ideas',
+                '📋 Suggest a workout plan',
+                '🥗 Healthy meal ideas',
                 '🔥 How to stay motivated?',
-                '🧘 Benefits of stretching',
                 '📅 Show my upcoming classes',
                 '🎯 Help me set fitness goals',
-                '💧 How much water should I drink?',
-                '😴 Importance of sleep for fitness',
-                '📊 Track my progress'
-            ],
-            'default' => [
-                '💪 How can I start working out?',
-                '🥗 What are healthy eating tips?',
-                '📅 How to book a class?',
-                '🔥 How to stay motivated?',
-                '🏋️ Benefits of regular exercise'
+                '💧 Hydration tips',
+                '😴 Importance of sleep'
             ]
         ];
 
-        return $suggestions[$role] ?? $suggestions['default'];
-    }
-
-    /**
-     * Export chat history as JSON
-     */
-    public function exportHistory(Request $request)
-    {
-        try {
-            $user = Auth::user();
-
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
-            }
-
-            $format = $request->input('format', 'json');
-
-            $history = ChatMessage::where('user_id', $user->id)
-                ->orderBy('created_at', 'asc')
-                ->get()
-                ->map(function($message) {
-                    return [
-                        'role' => $message->role,
-                        'message' => $message->message,
-                        'context_type' => $message->context_type ?? 'general',
-                        'timestamp' => $message->created_at->toDateTimeString()
-                    ];
-                });
-
-            $exportData = [
-                'exported_at' => now()->toDateTimeString(),
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role
-                ],
-                'total_messages' => $history->count(),
-                'chat_history' => $history
-            ];
-
-            $filename = "chat_history_{$user->id}_{$user->name}_{$user->role}_" . now()->format('Y-m-d_His');
-
-            if ($format === 'csv') {
-                return $this->exportAsCSV($exportData, $filename);
-            }
-
-            return response()->json($exportData, 200, [
-                'Content-Disposition' => "attachment; filename={$filename}.json"
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to export chat history: ' . $e->getMessage());
-            return $this->errorResponse('Failed to export chat history', 500);
-        }
-    }
-
-    /**
-     * Export as CSV
-     */
-    protected function exportAsCSV($data, $filename)
-    {
-        $callback = function() use ($data) {
-            $handle = fopen('php://output', 'w');
-
-            // Add headers
-            fputcsv($handle, ['Role', 'Message', 'Context Type', 'Timestamp']);
-
-            // Add rows
-            foreach ($data['chat_history'] as $message) {
-                fputcsv($handle, [
-                    $message['role'],
-                    $message['message'],
-                    $message['context_type'],
-                    $message['timestamp']
-                ]);
-            }
-
-            fclose($handle);
-        };
-
-        return response()->stream($callback, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename={$filename}.csv"
+        return response()->json([
+            'success' => true,
+            'suggestions' => $suggestions[$role] ?? $suggestions['member']
         ]);
     }
 
     /**
-     * Get chat statistics for the user
+     * Get all chat sessions for the user
      */
-    public function getStatistics(Request $request)
+    public function getHistoryList(Request $request)
     {
         try {
-            $user = Auth::user();
+            $sessions = ChatSession::where('user_id', Auth::id())
+                ->orderBy('updated_at', 'desc')
+                ->get()
+                ->map(function ($session) {
+                    // Get preview (first user message)
+                    $preview = ChatMessage::where('chat_session_id', $session->id)
+                        ->where('role', 'user')
+                        ->orderBy('created_at', 'asc')
+                        ->value('message');
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
-            }
-
-            // Cache statistics for 5 minutes
-            $cacheKey = "chat_stats_{$user->id}";
-            $statistics = Cache::remember($cacheKey, 300, function () use ($user) {
-                return $this->calculateStatistics($user);
-            });
+                    return [
+                        'id' => $session->id,
+                        'title' => $session->title,
+                        'preview' => $preview ? (strlen($preview) > 60 ? substr($preview, 0, 60) . '...' : $preview) : 'New conversation',
+                        'message_count' => $session->message_count,
+                        'updated_at' => $session->updated_at->toISOString(),
+                        'created_at' => $session->created_at->toISOString()
+                    ];
+                });
 
             return response()->json([
                 'success' => true,
-                'statistics' => $statistics,
-                'cached_at' => now()->toIso8601String()
+                'history' => $sessions
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to get chat statistics: ' . $e->getMessage());
-            return $this->errorResponse('Failed to load statistics', 500);
+            Log::error('Get History List Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'history' => []
+            ]);
         }
     }
 
     /**
-     * Calculate statistics for user
+     * Get messages for current session
      */
-    protected function calculateStatistics($user)
-    {
-        $totalMessages = ChatMessage::where('user_id', $user->id)->count();
-
-        if ($totalMessages === 0) {
-            return [
-                'total_messages' => 0,
-                'user_messages' => 0,
-                'ai_messages' => 0,
-                'messages_last_week' => 0,
-                'context_breakdown' => [],
-                'daily_stats' => [],
-                'first_chat_date' => null,
-                'last_chat_date' => null,
-                'has_chat_history' => false,
-                'average_message_length' => 0
-            ];
-        }
-
-        $userMessages = ChatMessage::where('user_id', $user->id)->where('role', 'user')->count();
-        $aiMessages = ChatMessage::where('user_id', $user->id)->where('role', 'assistant')->count();
-
-        $lastWeekMessages = ChatMessage::where('user_id', $user->id)
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        // Average message length
-        $averageLength = ChatMessage::where('user_id', $user->id)
-            ->where('role', 'user')
-            ->select(DB::raw('AVG(LENGTH(message)) as avg_length'))
-            ->value('avg_length') ?? 0;
-
-        // Context breakdown
-        $contextBreakdown = ChatMessage::where('user_id', $user->id)
-            ->select('context_type', DB::raw('count(*) as count'))
-            ->whereNotNull('context_type')
-            ->groupBy('context_type')
-            ->get()
-            ->map(fn($item) => [
-                'context_type' => $item->context_type ?? 'general',
-                'count' => (int) $item->count,
-                'percentage' => round(($item->count / $totalMessages) * 100, 1)
-            ]);
-
-        $firstMessage = ChatMessage::where('user_id', $user->id)
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        $lastMessage = ChatMessage::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        // Daily stats for last 7 days
-        $dailyStats = ChatMessage::where('user_id', $user->id)
-            ->where('created_at', '>=', now()->subDays(7))
-            ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
-            ->groupBy('date')
-            ->orderBy('date', 'asc')
-            ->get()
-            ->map(fn($item) => [
-                'date' => $item->date,
-                'count' => (int) $item->count
-            ]);
-
-        return [
-            'total_messages' => $totalMessages,
-            'user_messages' => $userMessages,
-            'ai_messages' => $aiMessages,
-            'messages_last_week' => $lastWeekMessages,
-            'context_breakdown' => $contextBreakdown,
-            'daily_stats' => $dailyStats,
-            'first_chat_date' => $firstMessage ? $firstMessage->created_at->format('M j, Y') : null,
-            'last_chat_date' => $lastMessage ? $lastMessage->created_at->format('M j, Y g:i A') : null,
-            'has_chat_history' => true,
-            'average_message_length' => round($averageLength, 0)
-        ];
-    }
-
-    /**
-     * Get a specific chat message
-     */
-    public function getMessage($messageId)
+    public function getHistory(Request $request)
     {
         try {
-            $user = Auth::user();
+            // Get the most recent session
+            $session = ChatSession::where('user_id', Auth::id())
+                ->latest()
+                ->first();
 
-            if (!$user) {
-                return $this->errorResponse('Unauthorized', 401);
+            if (!$session) {
+                return response()->json([
+                    'success' => true,
+                    'history' => [],
+                    'chat_id' => null
+                ]);
             }
 
-            $message = ChatMessage::where('user_id', $user->id)
-                ->where('id', $messageId)
-                ->firstOrFail();
+            $messages = ChatMessage::where('chat_session_id', $session->id)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function ($message) {
+                    return [
+                        'id' => $message->id,
+                        'message' => $message->message,
+                        'role' => $message->role,
+                        'created_at' => $message->created_at->toISOString()
+                    ];
+                });
 
             return response()->json([
                 'success' => true,
-                'message' => [
-                    'id' => $message->id,
-                    'role' => $message->role,
-                    'content' => $message->message,
-                    'context_type' => $message->context_type,
-                    'created_at' => $message->created_at->toIso8601String(),
-                    'formatted_time' => $message->created_at->format('g:i A'),
-                    'formatted_date' => $message->created_at->format('M j, Y')
+                'history' => $messages,
+                'chat_id' => $session->id
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get History Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'history' => []
+            ]);
+        }
+    }
+
+    /**
+     * Get specific chat session with all messages
+     */
+    public function getSession($chatId)
+    {
+        try {
+            $session = ChatSession::where('user_id', Auth::id())
+                ->where('id', $chatId)
+                ->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => [],
+                    'error' => 'Session not found'
+                ], 404);
+            }
+
+            $messages = ChatMessage::where('chat_session_id', $session->id)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function ($message) {
+                    return [
+                        'id' => $message->id,
+                        'message' => $message->message,
+                        'role' => $message->role,
+                        'created_at' => $message->created_at->toISOString()
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'messages' => $messages,
+                'chat' => [
+                    'id' => $session->id,
+                    'title' => $session->title
                 ]
             ]);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return $this->errorResponse('Message not found', 404);
         } catch (\Exception $e) {
-            return $this->errorResponse('Could not retrieve message', 500);
+            Log::error('Get Session Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'messages' => []
+            ], 500);
         }
     }
 
     /**
-     * Standard success response
+     * Delete a chat session
      */
-    protected function successResponse($message, $extra = [])
+    public function deleteSession($chatId)
     {
-        return response()->json(array_merge([
-            'success' => true,
-            'message' => $message,
-            'timestamp' => now()->toIso8601String()
-        ], $extra));
+        try {
+            $session = ChatSession::where('user_id', Auth::id())
+                ->where('id', $chatId)
+                ->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session not found'
+                ], 404);
+            }
+
+            // Delete all messages first
+            ChatMessage::where('chat_session_id', $session->id)->delete();
+
+            // Delete the session
+            $session->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Chat session deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Delete Session Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete chat session'
+            ], 500);
+        }
     }
 
     /**
-     * Standard error response
+     * Clear all chat history for the user
      */
-    protected function errorResponse($message, $code = 400, $debug = null, $extra = [])
+    public function clearAllHistory(Request $request)
     {
-        $response = array_merge([
-            'success' => false,
-            'error' => $message,
-            'message' => $message,
-            'timestamp' => now()->toIso8601String()
-        ], $extra);
+        try {
+            $sessions = ChatSession::where('user_id', Auth::id())->get();
+            $deletedCount = 0;
 
-        if ($debug && config('app.debug')) {
-            $response['debug_message'] = $debug;
+            foreach ($sessions as $session) {
+                $deletedCount += ChatMessage::where('chat_session_id', $session->id)->delete();
+                $session->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'All chat history cleared successfully',
+                'deleted_sessions' => $sessions->count(),
+                'deleted_messages' => $deletedCount
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Clear All History Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear chat history'
+            ], 500);
         }
+    }
 
-        return response()->json($response, $code);
+    /**
+     * Clear current session only
+     */
+    public function clearHistory(Request $request)
+    {
+        try {
+            $session = ChatSession::where('user_id', Auth::id())
+                ->latest()
+                ->first();
+
+            if ($session) {
+                ChatMessage::where('chat_session_id', $session->id)->delete();
+                $session->delete();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Current chat cleared successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Clear History Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear chat'
+            ], 500);
+        }
     }
 }

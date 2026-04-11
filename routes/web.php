@@ -12,8 +12,7 @@ use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controllers\AIController;
-use App\Http\Controllers\AIChatController;
+use App\Http\Controllers\ChatSessionController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
 use Illuminate\Support\Facades\Route;
@@ -39,8 +38,8 @@ Route::get('/lang/{locale}', function ($locale) {
         app()->setLocale($locale);
 
         // Update user preference if logged in
-        if (auth()->check()) {
-            auth()->user()->update(['language' => $locale]);
+        if (Auth::check()) {
+            Auth::user()->update(['language' => $locale]);
         }
     }
     return redirect()->back();
@@ -92,21 +91,35 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |======================================================================
-    | AI CHAT SYSTEM (Available for ALL authenticated users)
+    | AI CHAT SYSTEM - SESSION BASED (Available for ALL authenticated users)
     |======================================================================
     */
     Route::prefix('chat')->name('chat.')->group(function () {
-        // Main chat endpoints
-        Route::post('/send', [AIChatController::class, 'sendMessage'])->name('send');
-        Route::get('/history', [AIChatController::class, 'getHistory'])->name('history');
-        Route::delete('/clear', [AIChatController::class, 'clearHistory'])->name('clear');
-        Route::delete('/message/{messageId}', [AIChatController::class, 'deleteMessage'])->name('message.delete');
-        Route::get('/message/{messageId}', [AIChatController::class, 'getMessage'])->name('message.show');
+        // Session management
+        Route::get('/sessions', [ChatSessionController::class, 'index'])->name('sessions.index');
+        Route::get('/sessions/current', [ChatSessionController::class, 'getCurrentSession'])->name('sessions.current');
+        Route::post('/session', [ChatSessionController::class, 'store'])->name('session.store');
+        Route::get('/session/{id}', [ChatSessionController::class, 'show'])->name('session.show');
+        Route::put('/session/{id}', [ChatSessionController::class, 'update'])->name('session.update');
+        Route::delete('/session/{id}', [ChatSessionController::class, 'destroy'])->name('session.destroy');
+
+        // Chat messaging
+        Route::post('/send', [ChatSessionController::class, 'sendMessage'])->name('send');
+        Route::post('/message/{messageId}/regenerate', [ChatSessionController::class, 'regenerateMessage'])->name('message.regenerate');
 
         // Suggestions and utilities
-        Route::get('/suggestions', [AIChatController::class, 'getSuggestions'])->name('suggestions');
-        Route::get('/export', [AIChatController::class, 'exportHistory'])->name('export');
-        Route::get('/statistics', [AIChatController::class, 'getStatistics'])->name('statistics');
+        Route::get('/suggestions', [ChatSessionController::class, 'getSuggestions'])->name('suggestions');
+        Route::delete('/clear-all', [ChatSessionController::class, 'clearAllHistory'])->name('clear-all');
+        Route::get('/export', [ChatSessionController::class, 'exportHistory'])->name('export');
+
+        // Legacy routes (for backward compatibility - can be removed later)
+        Route::get('/history', [ChatSessionController::class, 'getHistory'])->name('history');
+        Route::get('/history-list', [ChatSessionController::class, 'getHistoryList'])->name('history-list');
+        Route::delete('/clear', [ChatSessionController::class, 'clearHistory'])->name('clear');
+        Route::delete('/message/{messageId}', [ChatSessionController::class, 'deleteMessage'])->name('message.delete');
+        Route::get('/message/{messageId}', [ChatSessionController::class, 'getMessage'])->name('message.show');
+        Route::get('/statistics', [ChatSessionController::class, 'getStatistics'])->name('statistics');
+        Route::post('/feedback', [ChatSessionController::class, 'submitFeedback'])->name('feedback');
     });
 
     /*
@@ -114,7 +127,7 @@ Route::middleware(['auth'])->group(function () {
     | MEMBER ROUTES
     |======================================================================
     */
-    Route::prefix('member')->name('member.')->middleware(['role:member'])->group(function () {
+    Route::middleware(['role:member'])->prefix('member')->name('member.')->group(function () {
 
         // ==================== MEMBER DASHBOARD ====================
         Route::get('/dashboard', [MemberDashboardController::class, 'index'])->name('dashboard');
@@ -134,6 +147,7 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{workout}', [MemberDashboardController::class, 'cancelWorkout'])->name('cancel');
             Route::get('/history', [MemberDashboardController::class, 'workoutHistory'])->name('history');
             Route::get('/upcoming', [MemberDashboardController::class, 'upcomingWorkouts'])->name('upcoming');
+            Route::get('/{workout}', [MemberDashboardController::class, 'getWorkoutDetails'])->name('details');
         });
 
         // Workout exercises
@@ -204,7 +218,7 @@ Route::middleware(['auth'])->group(function () {
     | INSTRUCTOR ROUTES
     |======================================================================
     */
-    Route::prefix('instructor')->name('instructor.')->middleware(['role:instructor'])->group(function () {
+    Route::middleware(['role:instructor'])->prefix('instructor')->name('instructor.')->group(function () {
 
         // Dashboard
         Route::get('/dashboard', function () {
@@ -330,7 +344,7 @@ Route::middleware(['auth'])->group(function () {
     | ADMIN ROUTES
     |======================================================================
     */
-    Route::prefix('admin')->name('admin.')->middleware(['role:admin'])->group(function () {
+    Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
 
         Route::get('/', [AdminController::class, 'dashboard'])->name('index');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');

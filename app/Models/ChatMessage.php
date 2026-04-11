@@ -10,24 +10,19 @@ class ChatMessage extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    protected $table = 'chat_messages';
+
     protected $fillable = [
         'user_id',
+        'chat_session_id',
         'role',
         'message',
+        'tokens_used',
+        'response_time_ms',
         'context_type',
         'metadata',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'metadata' => 'array',
         'created_at' => 'datetime',
@@ -35,7 +30,7 @@ class ChatMessage extends Model
     ];
 
     /**
-     * Get the user that owns the chat message.
+     * Get the user that owns the message
      */
     public function user(): BelongsTo
     {
@@ -43,7 +38,15 @@ class ChatMessage extends Model
     }
 
     /**
-     * Scope a query to only include messages from a specific user.
+     * Get the chat session that owns the message
+     */
+    public function chatSession(): BelongsTo
+    {
+        return $this->belongsTo(ChatSession::class, 'chat_session_id');
+    }
+
+    /**
+     * Scope for user messages
      */
     public function scopeForUser($query, $userId)
     {
@@ -51,7 +54,7 @@ class ChatMessage extends Model
     }
 
     /**
-     * Scope a query to only include user messages (not AI).
+     * Scope for user role messages
      */
     public function scopeUserMessages($query)
     {
@@ -59,7 +62,7 @@ class ChatMessage extends Model
     }
 
     /**
-     * Scope a query to only include AI assistant messages.
+     * Scope for assistant messages
      */
     public function scopeAssistantMessages($query)
     {
@@ -67,26 +70,39 @@ class ChatMessage extends Model
     }
 
     /**
-     * Scope a query to get recent messages.
+     * Scope for specific session
      */
-    public function scopeRecent($query, $limit = 50)
+    public function scopeFromSession($query, $sessionId)
     {
-        return $query->orderBy('created_at', 'desc')->limit($limit);
+        return $query->where('chat_session_id', $sessionId);
     }
 
     /**
-     * Get recent conversation history for a user.
+     * Get short preview of message
      */
-    public static function getConversationHistory($userId, $limit = 20)
+    public function getPreviewAttribute(): string
     {
-        return self::where('user_id', $userId)
-            ->orderBy('created_at', 'asc')
-            ->limit($limit)
-            ->get();
+        $preview = substr($this->message, 0, 100);
+        return strlen($this->message) > 100 ? $preview . '...' : $preview;
     }
 
     /**
-     * Check if message is from user.
+     * Get formatted message with markdown
+     */
+    public function getFormattedMessageAttribute(): string
+    {
+        $message = $this->message;
+
+        // Convert markdown-like syntax to HTML
+        $message = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $message);
+        $message = preg_replace('/\*(.*?)\*/', '<em>$1</em>', $message);
+        $message = nl2br($message);
+
+        return $message;
+    }
+
+    /**
+     * Check if message is from user
      */
     public function isFromUser(): bool
     {
@@ -94,36 +110,10 @@ class ChatMessage extends Model
     }
 
     /**
-     * Check if message is from AI assistant.
+     * Check if message is from AI
      */
     public function isFromAssistant(): bool
     {
         return $this->role === 'assistant';
-    }
-
-    /**
-     * Delete old messages (older than X days).
-     */
-    public static function deleteOldMessages($days = 30)
-    {
-        return self::where('created_at', '<', now()->subDays($days))->delete();
-    }
-
-    /**
-     * Get formatted message with word wrap.
-     */
-    public function getFormattedMessageAttribute(): string
-    {
-        return wordwrap($this->message, 80, "\n", true);
-    }
-
-    /**
-     * Get short preview of message (for listings).
-     */
-    public function getPreviewAttribute(): string
-    {
-        return strlen($this->message) > 100
-            ? substr($this->message, 0, 100) . '...'
-            : $this->message;
     }
 }
