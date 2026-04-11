@@ -290,43 +290,61 @@
                         </div>
                     </div>
 
-                    {{-- AI Chat Assistant --}}
-                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 overflow-hidden">
-                        <div class="p-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                            <div class="flex items-center gap-2">
-                                <span class="text-2xl">🤖</span>
-                                <div>
-                                    <h3 class="font-bold">AI Fitness Coach</h3>
-                                    <p class="text-xs text-purple-100">Available 24/7</p>
-                                </div>
-                            </div>
+                    {{-- Upcoming Workouts --}}
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 p-5">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-gray-800">📅 Upcoming Workouts</h3>
+                            <button onclick="openScheduleWorkoutModal()" class="text-xs text-purple-600 hover:underline">Schedule</button>
                         </div>
-                        <div class="h-80 overflow-y-auto p-4 space-y-3 bg-gray-50" id="chatMessages">
-                            <div class="flex justify-start animate-fade-in">
-                                <div class="max-w-[85%] bg-white rounded-2xl rounded-tl-none px-4 py-2 shadow-sm border border-gray-100">
-                                    <p class="text-sm text-gray-700">👋 Hi! I'm your AI fitness coach. Ask me about:</p>
-                                    <div class="flex flex-wrap gap-1 mt-2">
-                                        <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">💪 Workouts</span>
-                                        <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">🥗 Nutrition</span>
-                                        <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">🔥 Motivation</span>
-                                        <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">📈 Progress</span>
+                        <div class="space-y-3 max-h-80 overflow-y-auto">
+                            @forelse($upcomingWorkouts ?? [] as $workout)
+                                <div class="p-3 bg-gray-50 rounded-xl hover:bg-purple-50 transition cursor-pointer" onclick="viewWorkoutDetails({{ $workout->id }})">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <p class="font-semibold text-gray-800 text-sm">{{ $workout->title }}</p>
+                                            <p class="text-xs text-gray-500 mt-1">
+                                                📅 {{ \Carbon\Carbon::parse($workout->scheduled_date)->format('M d, Y') }}
+                                                @if($workout->scheduled_time)
+                                                    ⏰ {{ \Carbon\Carbon::parse($workout->scheduled_time)->format('g:i A') }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <span class="text-xs px-2 py-1 rounded-full {{ $workout->status === 'scheduled' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600' }}">
+                                            {{ ucfirst($workout->status) }}
+                                        </span>
                                     </div>
+                                    @if($workout->duration)
+                                        <p class="text-xs text-gray-400 mt-2">⏱️ {{ $workout->duration }} minutes</p>
+                                    @endif
                                 </div>
-                            </div>
-                        </div>
-                        <div class="p-4 border-t border-gray-100 bg-white">
-                            <div class="flex gap-2">
-                                <input type="text" id="chatInput"
-                                       placeholder="Ask me anything about fitness..."
-                                       class="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                       onkeypress="if(event.key==='Enter') sendChatMessage()">
-                                <button onclick="sendChatMessage()"
-                                        class="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition shadow-sm">
-                                    Send
-                                </button>
-                            </div>
+                            @empty
+                                <div class="text-center py-6">
+                                    <p class="text-gray-500 text-sm">No upcoming workouts scheduled</p>
+                                    <button onclick="openScheduleWorkoutModal()" class="mt-2 text-purple-600 text-xs hover:underline">Schedule your first workout →</button>
+                                </div>
+                            @endforelse
                         </div>
                     </div>
+
+                    {{-- Recent Achievements --}}
+                    @if(($recentAchievements ?? collect())->count() > 0)
+                    <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-2xl ring-1 ring-white/30 p-5">
+                        <h3 class="font-bold text-gray-800 mb-3">🏆 Recent Achievements</h3>
+                        <div class="space-y-2">
+                            @foreach($recentAchievements as $achievement)
+                                <div class="flex items-center gap-3 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl">
+                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-lg">🏅</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-gray-800">{{ $achievement->title }}</p>
+                                        <p class="text-xs text-gray-500">Earned {{ $achievement->created_at->diffForHumans() }}</p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
 
                     {{-- Instructor Chat --}}
                     @if($instructor ?? false)
@@ -376,7 +394,7 @@
         </div>
     </div>
 
-    {{-- Modals (Same as before) --}}
+    {{-- Modals --}}
     <div id="scheduleWorkoutModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) closeScheduleWorkoutModal()">
         <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl animate-fade-in">
             <div class="p-5 border-b border-gray-100 flex justify-between items-center">
@@ -395,9 +413,14 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
-                    <input type="datetime-local" name="scheduled_at" required
-                           min="{{ now()->format('Y-m-d\TH:i') }}"
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" name="scheduled_date" required
+                           min="{{ now()->format('Y-m-d') }}"
+                           class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Time (Optional)</label>
+                    <input type="time" name="scheduled_time"
                            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
                 <div class="flex gap-3 pt-3">
@@ -530,6 +553,19 @@
         </div>
     </div>
 
+    {{-- Workout Details Modal --}}
+    <div id="workoutDetailsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50" onclick="if(event.target===this) closeWorkoutDetailsModal()">
+        <div class="bg-white rounded-2xl max-w-2xl w-full mx-4 shadow-2xl animate-fade-in">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">Workout Details</h3>
+                <button onclick="closeWorkoutDetailsModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 rounded-lg hover:bg-gray-100 transition">×</button>
+            </div>
+            <div id="workoutDetailsContent" class="p-5 max-h-96 overflow-y-auto">
+                <!-- Dynamic content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
     {{-- Footer --}}
     <footer class="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-purple-500/30 mt-12">
         <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -642,7 +678,10 @@
             "🎯 \"Don't stop when you're tired. Stop when you're done.\""
         ];
 
-        document.getElementById('dailyMotivation').textContent = motivationQuotes[Math.floor(Math.random() * motivationQuotes.length)];
+        const motivationElement = document.getElementById('dailyMotivation');
+        if (motivationElement) {
+            motivationElement.textContent = motivationQuotes[Math.floor(Math.random() * motivationQuotes.length)];
+        }
 
         // Progress Chart
         @if(count($progressLabels ?? []) > 0)
@@ -680,63 +719,6 @@
             });
         }
         @endif
-
-        // AI Chat Function
-        async function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            const chatContainer = document.getElementById('chatMessages');
-
-            // Add user message
-            const userDiv = document.createElement('div');
-            userDiv.className = 'flex justify-end animate-fade-in';
-            userDiv.innerHTML = `<div class="max-w-[85%] bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2 shadow-sm"><p class="text-sm">${escapeHtml(message)}</p><p class="text-xs mt-1 opacity-70">Just now</p></div>`;
-            chatContainer.appendChild(userDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            input.value = '';
-            input.disabled = true;
-
-            // Add typing indicator
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'flex justify-start animate-fade-in';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = `<div class="bg-gray-200 rounded-2xl rounded-tl-none px-4 py-2"><div class="flex gap-1"><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0ms"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 150ms"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 300ms"></span></div></div>`;
-            chatContainer.appendChild(typingDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            try {
-                const response = await fetch('/member/ai/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ message: message })
-                });
-
-                const data = await response.json();
-                document.getElementById('typingIndicator')?.remove();
-
-                const aiDiv = document.createElement('div');
-                aiDiv.className = 'flex justify-start animate-fade-in';
-                aiDiv.innerHTML = `<div class="max-w-[85%] bg-white text-gray-700 rounded-2xl rounded-tl-none px-4 py-2 shadow-sm border border-gray-100"><p class="text-sm">${escapeHtml(data.response)}</p><p class="text-xs mt-1 text-gray-400">Just now</p></div>`;
-                chatContainer.appendChild(aiDiv);
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            } catch (error) {
-                document.getElementById('typingIndicator')?.remove();
-                const aiDiv = document.createElement('div');
-                aiDiv.className = 'flex justify-start animate-fade-in';
-                aiDiv.innerHTML = `<div class="max-w-[85%] bg-white text-gray-700 rounded-2xl rounded-tl-none px-4 py-2 shadow-sm border border-gray-100"><p class="text-sm">Sorry, I'm having trouble connecting. Please try again.</p><p class="text-xs mt-1 text-gray-400">Just now</p></div>`;
-                chatContainer.appendChild(aiDiv);
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            } finally {
-                input.disabled = false;
-                input.focus();
-            }
-        }
 
         async function sendToInstructor() {
             const input = document.getElementById('instructorChatInput');
@@ -806,6 +788,48 @@
             } catch (error) {
                 alert('Failed to check in');
             }
+        }
+
+        async function viewWorkoutDetails(workoutId) {
+            try {
+                const response = await fetch(`/member/workouts/${workoutId}`);
+                const data = await response.json();
+                if (data.success) {
+                    const content = document.getElementById('workoutDetailsContent');
+                    content.innerHTML = `
+                        <div class="space-y-4">
+                            <h4 class="font-bold text-lg">${data.workout.title}</h4>
+                            <p class="text-gray-600">${data.workout.description || 'No description available'}</p>
+                            <div class="flex gap-3">
+                                <span class="text-sm text-purple-600">⏱️ ${data.workout.duration || 45} min</span>
+                                <span class="text-sm text-green-600">🔥 ${data.workout.calories_burn || 'N/A'} cal</span>
+                            </div>
+                            <div>
+                                <h5 class="font-semibold mb-2">Exercises:</h5>
+                                <div class="space-y-2">
+                                    ${data.workout.exercises.map(ex => `
+                                        <div class="p-3 bg-gray-50 rounded-lg">
+                                            <p class="font-semibold">${ex.name}</p>
+                                            <p class="text-sm text-gray-600">${ex.pivot?.sets || 3} sets × ${ex.pivot?.reps || 12} reps</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('workoutDetailsModal').classList.remove('hidden');
+                    document.getElementById('workoutDetailsModal').classList.add('flex');
+                    document.body.style.overflow = 'hidden';
+                }
+            } catch (error) {
+                alert('Failed to load workout details');
+            }
+        }
+
+        function closeWorkoutDetailsModal() {
+            document.getElementById('workoutDetailsModal').classList.add('hidden');
+            document.getElementById('workoutDetailsModal').classList.remove('flex');
+            document.body.style.overflow = '';
         }
 
         function escapeHtml(text) {
@@ -926,8 +950,6 @@
         });
 
         // Auto-scroll chats
-        const chatContainer = document.getElementById('chatMessages');
-        if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
         const instructorContainer = document.getElementById('instructorMessages');
         if (instructorContainer) instructorContainer.scrollTop = instructorContainer.scrollHeight;
     </script>

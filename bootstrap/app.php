@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\CheckUserRole;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\RateLimitChat; // Add this
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'role' => CheckUserRole::class,
             'setlocale' => SetLocale::class,
+            'chat.rate.limit' => RateLimitChat::class, // Add chat rate limiting alias
         ]);
 
         // Global middleware (runs for every request)
@@ -133,11 +135,26 @@ return Application::configure(basePath: dirname(__DIR__))
             return redirect()->back()->with('error', 'You do not have permission to access this resource.');
         });
 
+        // Custom rate limit exception handling for chat
+        $exceptions->render(function (\Illuminate\Http\Exceptions\ThrottleRequestsException $e, Request $request) {
+            if ($request->is('chat/*') || $request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Too many requests',
+                    'message' => 'You have exceeded the rate limit. Please wait before sending more messages.',
+                    'retry_after' => $e->getHeaders()['Retry-After'] ?? 60
+                ], 429);
+            }
+
+            return response()->view('errors.429', [], 429);
+        });
+
         // Set log levels for specific exceptions
         $exceptions->level(QueryException::class, LogLevel::CRITICAL);
         $exceptions->level(AuthenticationException::class, LogLevel::WARNING);
         $exceptions->level(AccessDeniedHttpException::class, LogLevel::WARNING);
         $exceptions->level(NotFoundHttpException::class, LogLevel::INFO);
+        $exceptions->level(\Illuminate\Http\Exceptions\ThrottleRequestsException::class, LogLevel::INFO);
 
         // Reportable exceptions
         $exceptions->reportable(function (Throwable $e) {
@@ -164,6 +181,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Database\Eloquent\ModelNotFoundException::class,
             \Illuminate\Validation\ValidationException::class,
             \Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
+            \Illuminate\Http\Exceptions\ThrottleRequestsException::class,
         ]);
 
         // Handle throttling exceptions gracefully

@@ -13,6 +13,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\AIChatController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
 use Illuminate\Support\Facades\Route;
@@ -91,6 +92,25 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |======================================================================
+    | AI CHAT SYSTEM (Available for ALL authenticated users)
+    |======================================================================
+    */
+    Route::prefix('chat')->name('chat.')->group(function () {
+        // Main chat endpoints
+        Route::post('/send', [AIChatController::class, 'sendMessage'])->name('send');
+        Route::get('/history', [AIChatController::class, 'getHistory'])->name('history');
+        Route::delete('/clear', [AIChatController::class, 'clearHistory'])->name('clear');
+        Route::delete('/message/{messageId}', [AIChatController::class, 'deleteMessage'])->name('message.delete');
+        Route::get('/message/{messageId}', [AIChatController::class, 'getMessage'])->name('message.show');
+
+        // Suggestions and utilities
+        Route::get('/suggestions', [AIChatController::class, 'getSuggestions'])->name('suggestions');
+        Route::get('/export', [AIChatController::class, 'exportHistory'])->name('export');
+        Route::get('/statistics', [AIChatController::class, 'getStatistics'])->name('statistics');
+    });
+
+    /*
+    |======================================================================
     | MEMBER ROUTES
     |======================================================================
     */
@@ -99,7 +119,7 @@ Route::middleware(['auth'])->group(function () {
         // ==================== MEMBER DASHBOARD ====================
         Route::get('/dashboard', [MemberDashboardController::class, 'index'])->name('dashboard');
 
-        // AI Chat - Main endpoint
+        // AI Chat - Main endpoint (legacy, keep for compatibility)
         Route::post('/ai-chat', [MemberDashboardController::class, 'aiChat'])->name('ai.chat');
 
         // Workout Templates (for scheduling)

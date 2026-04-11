@@ -174,7 +174,7 @@ class BookingController extends Controller
                 $message .= ' 📧 A confirmation email has been sent to ' . $user->email;
             }
 
-            return redirect()->route('member.bookings')->with('success', $message);
+            return redirect()->route('member.bookings.index')->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -244,7 +244,7 @@ class BookingController extends Controller
                 $message .= ' 📧 A confirmation email has been sent to ' . $user->email;
             }
 
-            return redirect()->route('member.bookings')->with('success', $message);
+            return redirect()->route('member.bookings.index')->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -261,7 +261,7 @@ class BookingController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view receipts.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view receipts.');
         }
 
         $receipts = Receipt::where('user_id', $user->id)
@@ -280,7 +280,7 @@ class BookingController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view receipts.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view receipts.');
         }
 
         $receipt = Receipt::where('user_id', $user->id)
@@ -299,7 +299,7 @@ class BookingController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view their bookings.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view their bookings.');
         }
 
         $allBookings = $user->bookings()
@@ -323,7 +323,7 @@ class BookingController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view their bookings.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view their bookings.');
         }
 
         $allBookings = $user->bookings()

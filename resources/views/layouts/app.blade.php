@@ -91,6 +91,38 @@
             [dir="rtl"] .flex-row {
                 flex-direction: row-reverse;
             }
+
+            /* Custom scrollbar for chat */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 10px;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 10px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+
+            .dark ::-webkit-scrollbar-track {
+                background: #374151;
+            }
+
+            .dark ::-webkit-scrollbar-thumb {
+                background: #6b7280;
+            }
+
+            .dark ::-webkit-scrollbar-thumb:hover {
+                background: #9ca3af;
+            }
         </style>
     </head>
 
@@ -113,6 +145,93 @@
             </main>
         </div>
 
+        {{-- AI Chat Sidebar Component --}}
+        @include('components.ai-chat-sidebar')
+
         @stack('scripts')
+
+        {{-- Additional JavaScript for chat functionality --}}
+        <script>
+            // Make sure openChat function is globally available
+            window.openChat = function() {
+                const sidebar = document.getElementById('aiChatSidebar');
+                const overlay = document.getElementById('chatOverlay');
+
+                if (sidebar && overlay) {
+                    sidebar.classList.remove('hidden');
+                    overlay.classList.remove('hidden');
+
+                    setTimeout(() => {
+                        sidebar.classList.remove('translate-x-full');
+                        overlay.classList.remove('opacity-0');
+                        overlay.classList.add('opacity-100');
+                    }, 10);
+
+                    // Focus input after animation
+                    setTimeout(() => {
+                        const input = document.getElementById('chatInput');
+                        if (input) input.focus();
+                    }, 300);
+                } else {
+                    console.error('Chat sidebar elements not found');
+                }
+            };
+
+            window.closeChat = function() {
+                const sidebar = document.getElementById('aiChatSidebar');
+                const overlay = document.getElementById('chatOverlay');
+
+                if (sidebar && overlay) {
+                    sidebar.classList.add('translate-x-full');
+                    overlay.classList.remove('opacity-100');
+                    overlay.classList.add('opacity-0');
+
+                    setTimeout(() => {
+                        sidebar.classList.add('hidden');
+                        overlay.classList.add('hidden');
+                    }, 300);
+                }
+            };
+
+            // Close chat with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const sidebar = document.getElementById('aiChatSidebar');
+                    if (sidebar && !sidebar.classList.contains('hidden')) {
+                        closeChat();
+                    }
+                }
+            });
+
+            // Prevent body scroll when chat is open
+            function toggleBodyScroll(disable) {
+                if (disable) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                }
+            }
+
+            // Watch for chat open/close
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        const sidebar = document.getElementById('aiChatSidebar');
+                        if (sidebar) {
+                            const isHidden = sidebar.classList.contains('hidden');
+                            toggleBodyScroll(!isHidden);
+                        }
+                    }
+                });
+            });
+
+            // Start observing when DOM is loaded
+            document.addEventListener('DOMContentLoaded', function() {
+                const sidebar = document.getElementById('aiChatSidebar');
+                if (sidebar) {
+                    observer.observe(sidebar, { attributes: true });
+                }
+            });
+        </script>
     </body>
 </html>

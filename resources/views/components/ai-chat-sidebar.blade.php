@@ -1,0 +1,940 @@
+{{-- PREMIUM AI Chat Sidebar Component --}}
+@php
+    $user = Auth::user();
+    $userRole = $user->role ?? 'member';
+
+    // Role-based greeting
+    $greetings = [
+        'admin' => ['icon' => '👑', 'message' => 'Welcome back, Administrator'],
+        'instructor' => ['icon' => '🧑‍🏫', 'message' => 'Ready to inspire your class today?'],
+        'member' => ['icon' => '💪', 'message' => 'Ready for an amazing workout?'],
+    ];
+    $greeting = $greetings[$userRole] ?? $greetings['member'];
+@endphp
+
+<div id="aiChatSidebar" class="fixed inset-y-0 right-0 z-50 hidden w-full sm:w-96 md:w-[480px] bg-gradient-to-b from-gray-900/95 to-gray-950/95 backdrop-blur-xl shadow-2xl transform transition-all duration-500 ease-out translate-x-full">
+    <div class="flex flex-col h-full">
+        <!-- Premium Header with Glassmorphism -->
+        <div class="relative overflow-hidden bg-gradient-to-r from-purple-600/90 via-purple-500/90 to-blue-600/90 backdrop-blur-sm">
+            <div class="absolute inset-0 bg-black/20"></div>
+            <div class="relative flex items-center justify-between p-5">
+                <div class="flex items-center space-x-3">
+                    <div class="relative">
+                        <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                        </div>
+                        <div class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white tracking-tight">MyGym AI</h3>
+                        <p class="text-xs text-purple-200 flex items-center gap-1">
+                            <span>Powered by Groq</span>
+                            <span class="w-1 h-1 bg-purple-300 rounded-full"></span>
+                            <span>Ultra-Fast</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleChatHistory()" class="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200" title="Chat History">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                    </button>
+                    <button onclick="startNewChat()" class="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200" title="New Chat">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </button>
+                    <button onclick="closeChat()" class="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contextual Greeting -->
+        <div class="px-5 pt-4 pb-2 border-b border-gray-800/50">
+            <div class="flex items-center gap-3 text-sm">
+                <span class="text-2xl">{{ $greeting['icon'] }}</span>
+                <div class="flex-1">
+                    <p class="font-semibold text-white">{{ $greeting['message'] }}</p>
+                    <p class="text-xs text-gray-400">{{ ucfirst($userRole) }} • {{ $user->name }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500" id="messageCount">0 messages</p>
+                    <button onclick="exportChatHistory()" class="text-xs text-purple-400 hover:text-purple-300 transition mt-1">Export</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat History Side Panel -->
+        <div id="chatHistoryPanel" class="absolute inset-0 z-10 bg-gray-900/98 backdrop-blur-xl transform transition-all duration-300 -translate-x-full">
+            <div class="flex flex-col h-full">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+                    <h4 class="font-semibold text-white">Chat History</h4>
+                    <button onclick="toggleChatHistory()" class="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="chatHistoryList" class="flex-1 overflow-y-auto p-3 space-y-2">
+                    <div class="text-center text-gray-500 py-8">Loading history...</div>
+                </div>
+                <div class="p-4 border-t border-gray-800">
+                    <button onclick="clearAllHistory()" class="w-full px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl text-sm transition">
+                        Clear All History
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Suggestions Section with Toggle -->
+        <div id="quickSuggestionsSection" class="px-5 py-3 border-b border-gray-800/50">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Quick Suggestions
+                </p>
+                <div class="flex items-center gap-2">
+                    <button onclick="refreshSuggestions()" class="text-xs text-purple-400 hover:text-purple-300 transition flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                    <button id="toggleSuggestionsBtn" onclick="toggleSuggestions()" class="text-xs text-gray-500 hover:text-gray-400 transition" title="Hide suggestions">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="quickSuggestions" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto transition-all duration-300">
+                <div class="animate-pulse flex gap-2">
+                    <div class="h-8 w-20 bg-gray-700 rounded-full"></div>
+                    <div class="h-8 w-24 bg-gray-700 rounded-full"></div>
+                    <div class="h-8 w-28 bg-gray-700 rounded-full"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Messages Area with Premium Styling -->
+        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4" id="chatMessages" style="scroll-behavior: smooth;">
+            <!-- Welcome Message -->
+            <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
+                <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                        <span class="text-xs text-gray-500">Online</span>
+                    </div>
+                    <p class="text-sm text-gray-200 leading-relaxed">👋 Hello! I'm your intelligent fitness assistant. I can help with workouts, nutrition, class bookings, and motivation. What brings you here today?</p>
+                    <span class="text-xs text-gray-500 mt-2 block">{{ now()->format('g:i A') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Premium Input Area -->
+        <div class="border-t border-gray-800 bg-gradient-to-t from-gray-900 to-gray-950 p-4">
+            <div class="relative">
+                <textarea id="chatInput" rows="1" class="w-full px-5 py-4 bg-gray-800/50 backdrop-blur border border-gray-700 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-400 resize-none transition-all duration-200 pr-24" placeholder="Ask me anything..." style="max-height: 120px;"></textarea>
+                <div class="absolute right-2 bottom-2 flex items-center gap-2">
+                    <span id="charCount" class="text-xs text-gray-500">0</span>
+                    <button onclick="sendMessage()" id="sendButton" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:opacity-90 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                        <span class="hidden sm:inline text-sm">Send</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between mt-2 px-1">
+                <p class="text-xs text-gray-500">↵ Enter to send • Shift+Enter for new line</p>
+                <button onclick="clearInput()" class="text-xs text-gray-500 hover:text-gray-400 transition">Clear</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Premium Overlay -->
+<div id="chatOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden transition-all duration-300"></div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+
+    @keyframes slideInLeft {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
+    }
+
+    @keyframes typingWave {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-8px); opacity: 1; }
+    }
+
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-slide-in { animation: slideIn 0.3s ease-out; }
+    .animate-slide-in-left { animation: slideInLeft 0.3s ease-out; }
+
+    .typing-dot {
+        animation: typingWave 1.2s infinite;
+    }
+
+    /* Premium Scrollbar */
+    #chatMessages::-webkit-scrollbar,
+    #chatHistoryList::-webkit-scrollbar,
+    #quickSuggestions::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    #chatMessages::-webkit-scrollbar-track,
+    #chatHistoryList::-webkit-scrollbar-track,
+    #quickSuggestions::-webkit-scrollbar-track {
+        background: rgba(31, 41, 55, 0.5);
+        border-radius: 10px;
+    }
+
+    #chatMessages::-webkit-scrollbar-thumb,
+    #chatHistoryList::-webkit-scrollbar-thumb,
+    #quickSuggestions::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+        border-radius: 10px;
+    }
+
+    /* Message bubble hover effects */
+    .message-bubble {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .message-bubble:hover {
+        transform: translateX(2px);
+    }
+
+    /* Glassmorphism effects */
+    .glass-effect {
+        background: rgba(17, 24, 39, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    /* Focus styles */
+    #chatInput:focus {
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+    }
+
+    /* History item hover */
+    .history-item {
+        transition: all 0.2s ease;
+    }
+
+    .history-item:hover {
+        background: rgba(139, 92, 246, 0.1);
+        transform: translateX(4px);
+    }
+
+    /* Suggestions collapsed state */
+    .suggestions-collapsed {
+        max-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 0;
+        overflow: hidden;
+    }
+
+    /* Mobile full-screen adjustment */
+    @media (max-width: 640px) {
+        #aiChatSidebar {
+            width: 100% !important;
+        }
+    }
+</style>
+
+<script>
+    // State management
+    let isProcessing = false;
+    let messageCount = 0;
+    let currentChatId = null;
+    let suggestionsVisible = true;
+
+    // DOM Elements
+    let messagesContainer, chatInput, sendButton, charCountSpan, suggestionsContainer, suggestionsSection;
+
+    // Initialize DOM elements after page load
+    function initElements() {
+        messagesContainer = document.getElementById('chatMessages');
+        chatInput = document.getElementById('chatInput');
+        sendButton = document.getElementById('sendButton');
+        charCountSpan = document.getElementById('charCount');
+        suggestionsContainer = document.getElementById('quickSuggestions');
+        suggestionsSection = document.getElementById('quickSuggestionsSection');
+    }
+
+    // Auto-resize textarea
+    function initTextarea() {
+        if (!chatInput) return;
+
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            if (charCountSpan) charCountSpan.textContent = this.value.length;
+
+            if (this.value.length > 1800) {
+                charCountSpan.classList.add('text-yellow-500');
+                charCountSpan.classList.remove('text-gray-500');
+            } else {
+                charCountSpan.classList.remove('text-yellow-500');
+                charCountSpan.classList.add('text-gray-500');
+            }
+        });
+
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    // Toggle suggestions visibility
+    window.toggleSuggestions = function() {
+        suggestionsVisible = !suggestionsVisible;
+        const suggestionsDiv = document.getElementById('quickSuggestions');
+        const toggleBtn = document.getElementById('toggleSuggestionsBtn');
+
+        if (suggestionsVisible) {
+            suggestionsDiv.classList.remove('suggestions-collapsed');
+            toggleBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+            </svg>`;
+            toggleBtn.title = "Hide suggestions";
+        } else {
+            suggestionsDiv.classList.add('suggestions-collapsed');
+            toggleBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>`;
+            toggleBtn.title = "Show suggestions";
+        }
+    };
+
+    // Toggle chat history panel
+    window.toggleChatHistory = function() {
+        const panel = document.getElementById('chatHistoryPanel');
+        if (panel.classList.contains('-translate-x-full')) {
+            panel.classList.remove('-translate-x-full');
+            panel.classList.add('translate-x-0');
+            loadChatHistoryList();
+        } else {
+            panel.classList.remove('translate-x-0');
+            panel.classList.add('-translate-x-full');
+        }
+    };
+
+    // Load chat history list
+    async function loadChatHistoryList() {
+        const container = document.getElementById('chatHistoryList');
+        if (!container) return;
+
+        container.innerHTML = '<div class="text-center text-gray-500 py-8">Loading...</div>';
+
+        try {
+            const response = await fetch('/chat/history-list', {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && data.history && data.history.length > 0) {
+                container.innerHTML = data.history.map(chat => `
+                    <div class="history-item p-3 rounded-xl cursor-pointer bg-gray-800/30 hover:bg-gray-800/50 transition-all" onclick="loadChatSession('${chat.id}')">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <p class="text-sm text-white font-medium truncate">${escapeHtml(chat.preview || 'New Chat')}</p>
+                                <p class="text-xs text-gray-500 mt-1">${new Date(chat.updated_at).toLocaleDateString()} • ${chat.message_count || 0} messages</p>
+                            </div>
+                            <button onclick="event.stopPropagation(); deleteChatSession('${chat.id}')" class="text-gray-500 hover:text-red-400 transition p-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">No chat history yet.<br>Start a conversation!</div>';
+            }
+        } catch (error) {
+            console.error('Error loading history:', error);
+            container.innerHTML = '<div class="text-center text-gray-500 py-8">Failed to load history</div>';
+        }
+    }
+
+    // Load specific chat session
+    window.loadChatSession = async function(chatId) {
+        try {
+            const response = await fetch(`/chat/session/${chatId}`, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && messagesContainer) {
+                currentChatId = chatId;
+                // Clear current messages
+                messagesContainer.innerHTML = '';
+                messageCount = 0;
+
+                // Load messages into chat
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false, msg.created_at);
+                    messageCount++;
+                });
+
+                updateMessageCount();
+                scrollToBottom();
+
+                // Close history panel
+                toggleChatHistory();
+                showToast('Loaded conversation');
+            }
+        } catch (error) {
+            console.error('Error loading session:', error);
+            showToast('Failed to load conversation');
+        }
+    };
+
+    // Delete chat session
+    window.deleteChatSession = async function(chatId) {
+        if (!confirm('Delete this conversation?')) return;
+
+        try {
+            const response = await fetch(`/chat/session/${chatId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                loadChatHistoryList();
+                if (currentChatId === chatId) {
+                    startNewChat();
+                }
+                showToast('Conversation deleted');
+            }
+        } catch (error) {
+            console.error('Error deleting session:', error);
+            showToast('Failed to delete conversation');
+        }
+    };
+
+    // Start new chat
+    window.startNewChat = function() {
+        if (messagesContainer) {
+            // Clear messages but keep welcome message
+            const welcomeMsg = document.getElementById('welcomeMessage');
+            messagesContainer.innerHTML = '';
+            if (welcomeMsg) {
+                messagesContainer.appendChild(welcomeMsg.cloneNode(true));
+            } else {
+                // Recreate welcome message
+                messagesContainer.innerHTML = `
+                    <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
+                        <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                                    <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                                <span class="text-xs text-gray-500">Online</span>
+                            </div>
+                            <p class="text-sm text-gray-200 leading-relaxed">✨ New conversation started! How can I help you today?</p>
+                            <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            currentChatId = null;
+            messageCount = 0;
+            updateMessageCount();
+            showToast('New conversation started');
+            if (chatInput) chatInput.focus();
+        }
+    };
+
+    // Clear all history
+    window.clearAllHistory = async function() {
+        if (confirm('⚠️ This will delete ALL chat history. This action cannot be undone. Continue?')) {
+            try {
+                const response = await fetch('/chat/clear-all', {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    startNewChat();
+                    loadChatHistoryList();
+                    showToast('All history cleared');
+                }
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                showToast('Failed to clear history');
+            }
+        }
+    };
+
+    // Load chat history (messages for current session)
+    async function loadChatHistory() {
+        try {
+            const response = await fetch('/chat/history', {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && data.history && data.history.length > 0 && messagesContainer) {
+                const welcomeMsg = document.getElementById('welcomeMessage');
+                if (welcomeMsg) welcomeMsg.remove();
+
+                messageCount = data.history.length;
+                updateMessageCount();
+
+                data.history.forEach(msg => {
+                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false, msg.created_at);
+                });
+                scrollToBottom();
+            }
+        } catch (error) {
+            console.error('Error loading history:', error);
+        }
+    }
+
+    function updateMessageCount() {
+        const countElement = document.getElementById('messageCount');
+        if (countElement) countElement.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''}`;
+    }
+
+    // Load quick suggestions
+    async function loadSuggestions() {
+        if (!suggestionsContainer) return;
+
+        suggestionsContainer.innerHTML = '<div class="flex gap-2"><div class="h-8 w-20 bg-gray-700 rounded-full animate-pulse"></div></div>';
+
+        try {
+            const response = await fetch('/chat/suggestions', {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && data.suggestions && data.suggestions.length > 0) {
+                suggestionsContainer.innerHTML = data.suggestions.slice(0, 8).map(suggestion => `
+                    <button onclick="window.useSuggestion('${escapeHtml(suggestion).replace(/'/g, "\\'")}')"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-800/80 backdrop-blur hover:bg-gray-700/80 text-gray-300 text-xs rounded-full transition-all duration-200 hover:scale-105 border border-gray-700 hover:border-purple-500/50">
+                        <span>⚡</span>
+                        ${escapeHtml(suggestion.length > 35 ? suggestion.substring(0, 35) + '...' : suggestion)}
+                    </button>
+                `).join('');
+            } else {
+                suggestionsContainer.innerHTML = '<div class="text-xs text-gray-500">No suggestions available</div>';
+            }
+        } catch (error) {
+            console.error('Error loading suggestions:', error);
+            suggestionsContainer.innerHTML = '<div class="text-xs text-gray-500">Unable to load suggestions</div>';
+        }
+    }
+
+    window.refreshSuggestions = function() {
+        loadSuggestions();
+    };
+
+    window.useSuggestion = function(suggestion) {
+        // Auto-hide suggestions when a suggestion is used
+        if (suggestionsVisible) {
+            toggleSuggestions();
+        }
+
+        if (chatInput) {
+            chatInput.value = suggestion;
+            chatInput.dispatchEvent(new Event('input'));
+            chatInput.focus();
+            sendMessage();
+        }
+    };
+
+    // Send message to AI
+    window.sendMessage = async function() {
+        if (isProcessing) return;
+
+        if (!chatInput) return;
+
+        const message = chatInput.value.trim();
+        if (!message) {
+            chatInput.classList.add('border-red-500');
+            setTimeout(() => chatInput.classList.remove('border-red-500'), 500);
+            return;
+        }
+
+        if (message.length > 2000) {
+            showToast('Message is too long! Maximum 2000 characters.');
+            return;
+        }
+
+        // Auto-hide suggestions when user sends a message
+        if (suggestionsVisible) {
+            toggleSuggestions();
+        }
+
+        // Remove welcome message if present
+        const welcomeMsg = document.getElementById('welcomeMessage');
+        if (welcomeMsg) welcomeMsg.remove();
+
+        // Add user message to chat
+        addMessageToChat(message, 'user');
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        if (charCountSpan) charCountSpan.textContent = '0';
+        messageCount++;
+        updateMessageCount();
+
+        isProcessing = true;
+        if (sendButton) {
+            sendButton.disabled = true;
+        }
+
+        showTypingIndicator();
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            const response = await fetch('/chat/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    chat_id: currentChatId
+                })
+            });
+
+            const data = await response.json();
+
+            hideTypingIndicator();
+
+            if (data.success) {
+                currentChatId = data.chat_id;
+                await streamMessageToChat(data.message, 'ai');
+                messageCount++;
+                updateMessageCount();
+            } else {
+                addMessageToChat(data.message || 'Sorry, I encountered an error. Please try again.', 'ai');
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            hideTypingIndicator();
+            addMessageToChat('Network error. Please check your connection and try again.', 'ai');
+        } finally {
+            isProcessing = false;
+            if (sendButton) {
+                sendButton.disabled = false;
+            }
+            if (chatInput) chatInput.focus();
+        }
+    };
+
+    // Streaming effect for messages
+    async function streamMessageToChat(fullMessage, type) {
+        const messageDiv = createMessageContainer(type, '');
+        const contentDiv = messageDiv.querySelector('.message-content');
+
+        if (!messagesContainer) return;
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const words = fullMessage.split(/(\s+)/);
+        let displayedText = '';
+
+        for (let i = 0; i < words.length; i++) {
+            displayedText += words[i];
+            if (contentDiv) {
+                contentDiv.innerHTML = formatMessage(escapeHtml(displayedText));
+            }
+            await new Promise(resolve => setTimeout(resolve, 10));
+            scrollToBottom();
+        }
+
+        addCopyButton(messageDiv, fullMessage);
+    }
+
+    function createMessageContainer(type, content) {
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        div.className = `flex ${type === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in message-bubble`;
+
+        if (type === 'user') {
+            div.innerHTML = `
+                <div class="bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl rounded-tr-none px-5 py-3 max-w-[85%] shadow-xl">
+                    <div class="flex items-center gap-2 mb-1 justify-end">
+                        <span class="text-xs font-semibold text-purple-200">You</span>
+                        <div class="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="message-content text-sm text-white leading-relaxed">${formatMessage(escapeHtml(content))}</p>
+                    <div class="flex items-center justify-end gap-1 mt-2">
+                        <span class="text-xs text-purple-200">${time}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="glass-effect rounded-2xl rounded-tl-none px-5 py-3 max-w-[85%] shadow-xl border border-purple-500/20">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                        <span class="text-xs text-gray-500">• Groq</span>
+                    </div>
+                    <p class="message-content text-sm text-gray-200 leading-relaxed">${formatMessage(escapeHtml(content))}</p>
+                    <div class="flex items-center justify-between mt-2">
+                        <span class="text-xs text-gray-500">${time}</span>
+                        <div class="action-buttons opacity-0 transition-opacity duration-200"></div>
+                    </div>
+                </div>
+            `;
+        }
+        return div;
+    }
+
+    function addMessageToChat(message, type, saveToHistory = true, timestamp = null) {
+        if (!messagesContainer) return;
+
+        const div = createMessageContainer(type, message);
+        messagesContainer.appendChild(div);
+        scrollToBottom();
+
+        if (type === 'ai') {
+            addCopyButton(div, message);
+        }
+    }
+
+    function addCopyButton(messageDiv, text) {
+        const actionDiv = messageDiv.querySelector('.action-buttons');
+        if (!actionDiv) return;
+
+        actionDiv.classList.remove('opacity-0');
+        actionDiv.innerHTML = `
+            <button onclick="window.copyToClipboard('${escapeHtml(text).replace(/'/g, "\\'")}')"
+                class="copy-btn p-1 rounded-md text-gray-400 hover:text-purple-400 transition-all duration-200" title="Copy response">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+            </button>
+            <button onclick="window.regenerateLastMessage()" class="copy-btn p-1 rounded-md text-gray-400 hover:text-purple-400 transition-all duration-200" title="Regenerate response">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </button>
+        `;
+    }
+
+    window.copyToClipboard = function(text) {
+        navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard!');
+    };
+
+    window.regenerateLastMessage = async function() {
+        if (!messagesContainer) return;
+
+        const userMessages = Array.from(messagesContainer.querySelectorAll('.justify-end'));
+        if (userMessages.length === 0) return;
+
+        const lastUserMessage = userMessages[userMessages.length - 1];
+        const messageText = lastUserMessage.querySelector('.message-content')?.innerText;
+
+        if (messageText) {
+            const aiMessages = Array.from(messagesContainer.querySelectorAll('.justify-start'));
+            if (aiMessages.length > 0) {
+                aiMessages[aiMessages.length - 1].remove();
+                messageCount--;
+                updateMessageCount();
+            }
+            if (chatInput) {
+                chatInput.value = messageText;
+                sendMessage();
+            }
+        }
+    };
+
+    function showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm z-50 animate-fade-in';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    }
+
+    function formatMessage(message) {
+        let formatted = message;
+        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>');
+        formatted = formatted.replace(/\*(.*?)\*/g, '<em class="text-gray-300">$1</em>');
+        formatted = formatted.replace(/\n/g, '<br>');
+        formatted = formatted.replace(/• (.*?)(<br>|$)/g, '<li class="ml-4 list-disc">$1</li>');
+        return formatted;
+    }
+
+    function showTypingIndicator() {
+        if (!messagesContainer) return;
+
+        const typingDiv = document.createElement('div');
+        typingDiv.id = 'typingIndicator';
+        typingDiv.className = 'flex justify-start animate-fade-in';
+        typingDiv.innerHTML = `
+            <div class="glass-effect rounded-2xl rounded-tl-none px-5 py-3">
+                <div class="flex items-center gap-2">
+                    <div class="flex gap-1.5">
+                        <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-purple-400 rounded-full typing-dot" style="animation-delay: 0.4s"></div>
+                    </div>
+                    <span class="text-xs text-gray-400">AI is crafting response...</span>
+                </div>
+            </div>
+        `;
+        messagesContainer.appendChild(typingDiv);
+        scrollToBottom();
+    }
+
+    function hideTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) indicator.remove();
+    }
+
+    function scrollToBottom() {
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    window.clearInput = function() {
+        if (chatInput) {
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            if (charCountSpan) charCountSpan.textContent = '0';
+            chatInput.focus();
+        }
+    };
+
+    window.exportChatHistory = function() {
+        window.open('/chat/export', '_blank');
+        showToast('Exporting chat history...');
+    };
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Open/Close functions
+    window.openChat = function() {
+        const sidebar = document.getElementById('aiChatSidebar');
+        const overlay = document.getElementById('chatOverlay');
+
+        if (sidebar && overlay) {
+            sidebar.classList.remove('hidden');
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                sidebar.classList.remove('translate-x-full');
+                overlay.classList.remove('opacity-0');
+                overlay.classList.add('opacity-100');
+            }, 10);
+
+            initElements();
+            loadChatHistory();
+            loadSuggestions();
+            setTimeout(() => {
+                if (chatInput) chatInput.focus();
+            }, 300);
+        }
+    };
+
+    window.closeChat = function() {
+        const sidebar = document.getElementById('aiChatSidebar');
+        const overlay = document.getElementById('chatOverlay');
+
+        if (sidebar && overlay) {
+            sidebar.classList.add('translate-x-full');
+            overlay.classList.remove('opacity-100');
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                sidebar.classList.add('hidden');
+                overlay.classList.add('hidden');
+            }, 300);
+        }
+    };
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const sidebar = document.getElementById('aiChatSidebar');
+            if (sidebar && !sidebar.classList.contains('hidden')) {
+                closeChat();
+            }
+        }
+    });
+
+    // Close on overlay click
+    document.getElementById('chatOverlay')?.addEventListener('click', closeChat);
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initElements();
+        initTextarea();
+        loadSuggestions();
+    });
+</script>
