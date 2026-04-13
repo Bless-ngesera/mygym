@@ -2,7 +2,6 @@
     open: false,
     theme: localStorage.getItem('theme') || 'system',
     systemDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
-    localeOpen: false,
     currentLocale: '{{ app()->getLocale() }}',
     supportedLocales: {
         en: 'English',
@@ -50,7 +49,7 @@
             document.documentElement.classList.toggle('dark', value === 'dark');
         }
     }
-}" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-50">
+}" class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100/50 dark:border-gray-800/50 sticky top-0 z-50 shadow-sm">
 
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -58,7 +57,7 @@
             <div class="flex">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('home') }}" class="transition-opacity hover:opacity-80">
+                    <a href="{{ route('home') }}" class="transition-all duration-300 hover:opacity-80 hover:scale-105">
                         <img src="{{ asset('images/Project_Logo.png') }}"
                              alt="MyGym Logo"
                              class="h-9 w-auto">
@@ -142,53 +141,20 @@
                 </div>
             </div>
 
-            <!-- Right Side: AI Assistant, Language Switcher, Theme Switcher & User Dropdown -->
+            <!-- Right Side: AI Assistant, Theme Switcher & User Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6 gap-3">
                 <!-- AI ASSISTANT BUTTON - Added for all authenticated users -->
                 @auth
                 <button onclick="openChat()"
-                        class="relative group bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg transition-all duration-300 transform hover:scale-105 rounded-xl px-3 py-2 flex items-center gap-2"
+                        class="relative group bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 rounded-xl px-3 py-2 flex items-center gap-2"
                         aria-label="Open AI Assistant">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                     </svg>
                     <span class="text-white font-medium text-sm hidden md:inline-block">AI Assistant</span>
-                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse ring-2 ring-white dark:ring-gray-800"></span>
                 </button>
                 @endauth
-
-                <!-- Language Switcher Dropdown -->
-                <div x-data="{ localeOpen: false }" class="relative">
-                    <button @click="localeOpen = !localeOpen"
-                            class="relative p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 dark:text-gray-400 dark:hover:text-purple-400 dark:hover:bg-purple-900/30 rounded-xl transition-all duration-200"
-                            aria-label="Toggle language">
-                        <span class="text-xl" x-text="flagIcons[currentLocale] || '🌐'"></span>
-                    </button>
-
-                    <!-- Language Dropdown Menu -->
-                    <div x-show="localeOpen"
-                         @click.away="localeOpen = false"
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 translate-y-2"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 translate-y-2"
-                         class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden"
-                         style="display: none;">
-                        <div class="py-2">
-                            <template x-for="(name, code) in supportedLocales" :key="code">
-                                <a :href="'{{ url('locale') }}/' + code"
-                                   @click="localeOpen = false; currentLocale = code"
-                                   class="w-full px-4 py-2.5 text-left text-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 transition flex items-center gap-3">
-                                    <span class="text-lg" x-text="flagIcons[code]"></span>
-                                    <span class="text-gray-700 dark:text-gray-300" x-text="name"></span>
-                                    <span x-show="currentLocale === code" class="ml-auto text-purple-600">✓</span>
-                                </a>
-                            </template>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Theme Switcher Dropdown -->
                 <div x-data="{ themeOpen: false }" class="relative">
@@ -264,7 +230,7 @@
                 @auth
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <button class="flex items-center gap-2.5 bg-gradient-to-r from-indigo-50 to-indigo-50/50 hover:from-indigo-100 hover:to-indigo-100 dark:from-gray-700 dark:to-gray-700/50 dark:hover:from-gray-600 dark:hover:to-gray-600 px-3 py-1.5 rounded-xl border border-indigo-100/60 dark:border-gray-600 transition-all duration-200">
+                        <button class="flex items-center gap-2.5 bg-gradient-to-r from-indigo-50 to-indigo-50/50 hover:from-indigo-100 hover:to-indigo-100 dark:from-gray-800 dark:to-gray-800/50 dark:hover:from-gray-700 dark:hover:to-gray-700 px-3 py-1.5 rounded-xl border border-indigo-100/60 dark:border-gray-700 transition-all duration-200 shadow-sm hover:shadow-md">
                             <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=4F46E5&color=fff&bold=true&size=64"
                                  alt="Avatar" class="w-8 h-8 rounded-lg ring-2 ring-indigo-200 dark:ring-indigo-600">
                             <div class="hidden sm:block text-left">
@@ -403,7 +369,7 @@
 
             <!-- Hamburger -->
             <div class="-me-2 flex items-center sm:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none transition-colors">
+                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition-colors">
                     <svg class="h-6 w-6 text-gray-600 dark:text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                         <path :class="{'hidden': open, 'inline-flex': ! open }" class="inline-flex" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         <path :class="{'hidden': ! open, 'inline-flex': open }" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -414,7 +380,7 @@
     </div>
 
     <!-- Responsive Navigation Menu (Mobile) -->
-    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-700">
+    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800">
         <div class="pt-2 pb-3 space-y-1 px-4">
             @auth
                 <!-- Mobile AI Assistant Button -->
@@ -429,40 +395,24 @@
                 </div>
 
                 <!-- Mobile Theme Switcher -->
-                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-2">
+                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-800 mb-2">
                     <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Theme</p>
                     <div class="flex gap-2">
                         <button @click="theme = 'light'"
                                 class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                :class="theme === 'light' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'">
+                                :class="theme === 'light' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'">
                             Light
                         </button>
                         <button @click="theme = 'dark'"
                                 class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                :class="theme === 'dark' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'">
+                                :class="theme === 'dark' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'">
                             Dark
                         </button>
                         <button @click="theme = 'system'"
                                 class="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                :class="theme === 'system' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'">
+                                :class="theme === 'system' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'">
                             System
                         </button>
-                    </div>
-                </div>
-
-                <!-- Mobile Language Switcher -->
-                <div class="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-2">
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Language</p>
-                    <div class="grid grid-cols-2 gap-2">
-                        <template x-for="(name, code) in supportedLocales" :key="code">
-                            <a :href="'{{ url('locale') }}/' + code"
-                               @click="open = false; currentLocale = code"
-                               class="px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-                               :class="currentLocale === code ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'">
-                                <span class="text-lg" x-text="flagIcons[code]"></span>
-                                <span x-text="name"></span>
-                            </a>
-                        </template>
                     </div>
                 </div>
 
@@ -530,7 +480,7 @@
                 @endif
 
                 <!-- Divider -->
-                <div class="border-t border-gray-100 dark:border-gray-700 my-3"></div>
+                <div class="border-t border-gray-100 dark:border-gray-800 my-3"></div>
 
                 <!-- User Info -->
                 <div class="px-3 py-2">

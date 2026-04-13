@@ -12,6 +12,7 @@ use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\AIChatController;
 use App\Http\Controllers\ChatSessionController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
@@ -91,35 +92,31 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |======================================================================
-    | AI CHAT SYSTEM - SESSION BASED (Available for ALL authenticated users)
+    | AI CHAT SYSTEM - FULLY FUNCTIONAL (Available for ALL authenticated users)
     |======================================================================
     */
     Route::prefix('chat')->name('chat.')->group(function () {
+        // Main chat endpoints
+        Route::post('/send', [AIChatController::class, 'sendMessage'])->name('send');
+        Route::get('/suggestions', [AIChatController::class, 'getSuggestions'])->name('suggestions');
+
         // Session management
-        Route::get('/sessions', [ChatSessionController::class, 'index'])->name('sessions.index');
-        Route::get('/sessions/current', [ChatSessionController::class, 'getCurrentSession'])->name('sessions.current');
-        Route::post('/session', [ChatSessionController::class, 'store'])->name('session.store');
-        Route::get('/session/{id}', [ChatSessionController::class, 'show'])->name('session.show');
-        Route::put('/session/{id}', [ChatSessionController::class, 'update'])->name('session.update');
-        Route::delete('/session/{id}', [ChatSessionController::class, 'destroy'])->name('session.destroy');
+        Route::get('/sessions', [AIChatController::class, 'getSessions'])->name('sessions');
+        Route::get('/sessions/current', [AIChatController::class, 'getCurrentSession'])->name('sessions.current');
+        Route::post('/sessions', [AIChatController::class, 'createSession'])->name('sessions.create');
+        Route::get('/sessions/{id}', [AIChatController::class, 'getSession'])->name('sessions.show');
+        Route::delete('/sessions/{id}', [AIChatController::class, 'deleteSession'])->name('sessions.delete');
+        Route::put('/sessions/{id}', [ChatSessionController::class, 'update'])->name('chat.session.update');
+        Route::get('/share/{id}', [ChatSessionController::class, 'share'])->name('chat.session.share');
 
-        // Chat messaging
-        Route::post('/send', [ChatSessionController::class, 'sendMessage'])->name('send');
-        Route::post('/message/{messageId}/regenerate', [ChatSessionController::class, 'regenerateMessage'])->name('message.regenerate');
+        // History management
+        Route::delete('/clear-all', [AIChatController::class, 'clearAllHistory'])->name('clear-all');
+        Route::get('/export', [AIChatController::class, 'exportHistory'])->name('export');
 
-        // Suggestions and utilities
-        Route::get('/suggestions', [ChatSessionController::class, 'getSuggestions'])->name('suggestions');
-        Route::delete('/clear-all', [ChatSessionController::class, 'clearAllHistory'])->name('clear-all');
-        Route::get('/export', [ChatSessionController::class, 'exportHistory'])->name('export');
-
-        // Legacy routes (for backward compatibility - can be removed later)
-        Route::get('/history', [ChatSessionController::class, 'getHistory'])->name('history');
-        Route::get('/history-list', [ChatSessionController::class, 'getHistoryList'])->name('history-list');
-        Route::delete('/clear', [ChatSessionController::class, 'clearHistory'])->name('clear');
-        Route::delete('/message/{messageId}', [ChatSessionController::class, 'deleteMessage'])->name('message.delete');
-        Route::get('/message/{messageId}', [ChatSessionController::class, 'getMessage'])->name('message.show');
-        Route::get('/statistics', [ChatSessionController::class, 'getStatistics'])->name('statistics');
-        Route::post('/feedback', [ChatSessionController::class, 'submitFeedback'])->name('feedback');
+        // Legacy routes for backward compatibility (will be deprecated)
+        Route::get('/history-list', [AIChatController::class, 'getSessions'])->name('history-list');
+        Route::get('/history', [AIChatController::class, 'getCurrentSession'])->name('history');
+        Route::delete('/clear', [AIChatController::class, 'clearAllHistory'])->name('clear');
     });
 
     /*
