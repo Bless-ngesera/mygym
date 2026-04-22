@@ -87,16 +87,18 @@
     <!-- Simple dark overlay -->
     <div class="fixed inset-0 bg-black/30"></div>
 
-    <!-- Centered Content - NO EXTRA MARGIN -->
+    <!-- Centered Content - EXACT SAME WIDTH AS LOGIN PAGE (max-w-md) -->
     <div class="relative flex items-center justify-center min-h-screen px-4">
-        <div class="card-glass card-wrap rounded-2xl p-8 w-full max-w-3xl">
+        <div class="card-glass card-wrap rounded-2xl p-8 w-full max-w-md">
 
-            {{-- Brand --}}
-            <div class="text-center mb-6">
-                <h1 class="text-5xl font-extrabold tracking-tight">
-                    <span class="text-purple-700">My</span><span class="text-gray-900">Gym</span>
-                </h1>
-                <p class="mt-2 text-sm text-gray-600">
+            {{-- Brand - Logo (EXACT SAME AS LOGIN PAGE) --}}
+            <div class="text-center mb-8">
+                <div class="flex justify-center mb-3">
+                    <img src="{{ asset('images/Project_Logo.png') }}"
+                         alt="MyGym Logo"
+                         class="h-16 w-auto object-contain">
+                </div>
+                <p class="text-sm text-gray-600">
                     Create your fitness account
                 </p>
             </div>
@@ -121,7 +123,7 @@
             <form method="POST" action="{{ route('register') }}">
                 @csrf
 
-                <!-- Name -->
+                <!-- Name - SAME SPACING AS LOGIN PAGE -->
                 <div class="mb-4">
                     <label for="name" class="block label-text mb-1.5">Full Name</label>
                     <div class="relative">
@@ -143,7 +145,7 @@
                     </div>
                 </div>
 
-                <!-- Email Address -->
+                <!-- Email Address - SAME SPACING AS LOGIN PAGE -->
                 <div class="mb-4">
                     <label for="email" class="block label-text mb-1.5">Email Address</label>
                     <div class="relative">
@@ -164,7 +166,7 @@
                     </div>
                 </div>
 
-                <!-- Password -->
+                <!-- Password - SAME SPACING AS LOGIN PAGE -->
                 <div class="mb-4">
                     <label for="password" class="block label-text mb-1.5">Password</label>
                     <div class="relative">
@@ -185,7 +187,7 @@
                     <p class="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
                 </div>
 
-                <!-- Confirm Password -->
+                <!-- Confirm Password - SAME SPACING AS LOGIN PAGE -->
                 <div class="mb-5">
                     <label for="password_confirmation" class="block label-text mb-1.5">Confirm Password</label>
                     <div class="relative">
@@ -205,7 +207,7 @@
                     </div>
                 </div>
 
-                <!-- Terms -->
+                <!-- Terms - SAME SPACING AS REMEMBER ME ON LOGIN PAGE -->
                 <div class="flex items-start mb-6">
                     <input type="checkbox" id="terms" name="terms" required
                            class="mt-1 w-4 h-4 rounded border-gray-300 text-purple-700 focus:ring-purple-300">
@@ -215,21 +217,27 @@
                     </label>
                 </div>
 
-                <!-- Register Button -->
+                <!-- Register Button - SAME AS LOGIN BUTTON -->
                 <button type="submit"
                         class="register-btn w-full py-2.5 text-white text-sm font-semibold rounded-xl tracking-wide uppercase">
                     Create Account
                 </button>
 
-                <!-- Login Link -->
+                <!-- Login Link - SAME AS LOGIN PAGE STYLING -->
                 <p class="mt-5 text-center text-sm text-gray-600">
                     Already have an account?
                     <a href="{{ route('login') }}" class="login-link ml-1 font-semibold">Sign in →</a>
                 </p>
             </form>
 
-            {{-- Simple Footer --}}
+            {{-- Footer - EXACT SAME AS LOGIN PAGE --}}
             <div class="mt-7 pt-5 border-t divider-line text-center">
+                <div class="flex justify-center gap-6 mb-3">
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">About</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Terms</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Privacy</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Contact</a>
+                </div>
                 <p class="text-xs text-gray-400">
                     &copy; {{ date('Y') }} MyGym. All rights reserved.
                 </p>

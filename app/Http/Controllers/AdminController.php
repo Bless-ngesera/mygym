@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Artisan;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use League\Csv\Writer;
@@ -241,6 +242,228 @@ class AdminController extends Controller
     }
 
     /**
+     * ==================== SYSTEM MANAGEMENT METHODS ====================
+     */
+
+    /**
+     * Clear system cache
+     */
+    public function clearSystemCache()
+    {
+        try {
+            Artisan::call('cache:clear');
+            Artisan::call('config:clear');
+            Artisan::call('view:clear');
+            Artisan::call('route:clear');
+            Artisan::call('optimize:clear');
+
+            return redirect()->back()->with('success', 'System cache cleared successfully!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to clear cache: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get queue status
+     */
+    public function queueStatus()
+    {
+        try {
+            $failedJobs = DB::table('failed_jobs')->count();
+            $pendingJobs = DB::table('jobs')->count();
+
+            if (request()->ajax() || request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'pending_jobs' => $pendingJobs,
+                    'failed_jobs' => $failedJobs
+                ]);
+            }
+
+            return view('admin.system.queue-status', compact('pendingJobs', 'failedJobs'));
+        } catch (\Exception $e) {
+            if (request()->ajax() || request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+            return redirect()->back()->with('error', 'Failed to get queue status: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Restart queue worker
+     */
+    public function restartQueue()
+    {
+        try {
+            Artisan::call('queue:restart');
+
+            return redirect()->back()->with('success', 'Queue worker restarted successfully!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to restart queue: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * System health check
+     */
+    public function systemHealth()
+    {
+        try {
+            $phpVersion = phpversion();
+            $laravelVersion = \Illuminate\Foundation\Application::VERSION;
+            $serverSoftware = $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown';
+            $memoryUsage = memory_get_usage(true);
+            $memoryLimit = ini_get('memory_limit');
+            $maxExecutionTime = ini_get('max_execution_time');
+            $uploadMaxFilesize = ini_get('upload_max_filesize');
+            $postMaxSize = ini_get('post_max_size');
+
+            // Database connection check
+            $dbConnection = 'Connected';
+            try {
+                DB::connection()->getPdo();
+            } catch (\Exception $e) {
+                $dbConnection = 'Failed: ' . $e->getMessage();
+            }
+
+            return view('admin.system.health', compact(
+                'phpVersion',
+                'laravelVersion',
+                'serverSoftware',
+                'memoryUsage',
+                'memoryLimit',
+                'maxExecutionTime',
+                'uploadMaxFilesize',
+                'postMaxSize',
+                'dbConnection'
+            ));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to get system health: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * System logs
+     */
+    public function systemLogs()
+    {
+        try {
+            $logFile = storage_path('logs/laravel.log');
+            $logs = [];
+
+            if (file_exists($logFile)) {
+                $logContent = file_get_contents($logFile);
+                $logLines = explode("\n", $logContent);
+                $logs = array_reverse(array_slice($logLines, -500)); // Get last 500 lines
+
+                // Filter out empty lines
+                $logs = array_filter($logs, function($line) {
+                    return !empty(trim($line));
+                });
+            }
+
+            $logSize = file_exists($logFile) ? round(filesize($logFile) / 1024, 2) : 0; // Size in KB
+
+            return view('admin.system.logs', compact('logs', 'logSize'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to get system logs: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Clear logs
+     */
+    public function clearLogs()
+    {
+        try {
+            $logFile = storage_path('logs/laravel.log');
+            if (file_exists($logFile)) {
+                file_put_contents($logFile, '');
+            }
+
+            return redirect()->back()->with('success', 'System logs cleared successfully!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to clear logs: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * PHP Info
+     */
+    public function phpInfo()
+    {
+        if (!auth()->user()->hasRole('admin')) {
+            abort(403);
+        }
+
+        phpinfo();
+        exit;
+    }
+
+    /**
+     * Database backup
+     */
+    public function databaseBackup()
+    {
+        try {
+            $database = config('database.connections.mysql.database');
+            $username = config('database.connections.mysql.username');
+            $password = config('database.connections.mysql.password');
+            $host = config('database.connections.mysql.host');
+
+            $backupFile = storage_path('backups/' . $database . '_' . date('Y-m-d_H-i-s') . '.sql');
+
+            // Create backups directory if it doesn't exist
+            $backupDir = storage_path('backups');
+            if (!file_exists($backupDir)) {
+                mkdir($backupDir, 0755, true);
+            }
+
+            // Using mysqldump command
+            $command = sprintf(
+                'mysqldump --user=%s --password=%s --host=%s %s > %s 2>&1',
+                escapeshellarg($username),
+                escapeshellarg($password),
+                escapeshellarg($host),
+                escapeshellarg($database),
+                escapeshellarg($backupFile)
+            );
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode === 0 && file_exists($backupFile)) {
+                return response()->download($backupFile)->deleteFileAfterSend(true);
+            }
+
+            // Alternative: Use Laravel's database backup if mysqldump fails
+            if (!$file_exists($backupFile)) {
+                throw new \Exception('Failed to create database backup using mysqldump');
+            }
+
+            return redirect()->back()->with('error', 'Failed to create database backup');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to create database backup: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Optimize database
+     */
+    public function optimizeDatabase()
+    {
+        try {
+            Artisan::call('optimize');
+
+            return redirect()->back()->with('success', 'Database optimized successfully!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to optimize database: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * ==================== MEMBER CRUD ====================
      */
 
@@ -413,7 +636,6 @@ class AdminController extends Controller
             try {
                 Mail::to($user->email)->send(new InstructorRegisteredMail($user, $password));
             } catch (\Throwable $mailError) {
-                // Log mail error but don't stop the process
                 \Log::error('Failed to send instructor registration email: ' . $mailError->getMessage());
             }
 
@@ -486,5 +708,111 @@ class AdminController extends Controller
             return redirect()->route('admin.instructors.index')
                 ->withErrors(['error' => 'Unable to delete instructor: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Assign instructor to member
+     */
+    public function assignInstructor(Request $request, $memberId)
+    {
+        $validated = $request->validate([
+            'instructor_id' => 'required|exists:users,id'
+        ]);
+
+        try {
+            $member = User::where('role', 'member')->findOrFail($memberId);
+            $instructor = User::where('role', 'instructor')->findOrFail($validated['instructor_id']);
+
+            $member->instructor_id = $instructor->id;
+            $member->save();
+
+            return redirect()->back()->with('success', "{$instructor->name} assigned to {$member->name} successfully.");
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['error' => 'Failed to assign instructor: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Export members list
+     */
+    public function exportMembers()
+    {
+        $members = User::where('role', 'member')->get();
+
+        $csv = Writer::createFromString();
+        $csv->insertOne(['ID', 'Name', 'Email', 'Joined Date', 'Status']);
+
+        foreach ($members as $member) {
+            $csv->insertOne([
+                $member->id,
+                $member->name,
+                $member->email,
+                $member->created_at->format('Y-m-d'),
+                $member->status ?? 'Active'
+            ]);
+        }
+
+        $filename = 'members-list-' . date('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($csv) {
+            echo $csv->toString();
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    /**
+     * Bulk delete members
+     */
+    public function bulkDeleteMembers(Request $request)
+    {
+        $validated = $request->validate([
+            'member_ids' => 'required|array',
+            'member_ids.*' => 'exists:users,id'
+        ]);
+
+        try {
+            $deleted = 0;
+            foreach ($validated['member_ids'] as $memberId) {
+                $member = User::where('role', 'member')->find($memberId);
+                if ($member && !$member->bookings()->exists() && !$member->receipts()->exists()) {
+                    $member->delete();
+                    $deleted++;
+                }
+            }
+
+            return redirect()->back()->with('success', "{$deleted} members deleted successfully.");
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['error' => 'Failed to delete members: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Toggle instructor status
+     */
+    public function toggleInstructorStatus($id)
+    {
+        try {
+            $instructor = User::where('role', 'instructor')->findOrFail($id);
+            $instructor->status = $instructor->status === 'active' ? 'inactive' : 'active';
+            $instructor->save();
+
+            return redirect()->back()->with('success', "Instructor status updated to {$instructor->status}.");
+        } catch (\Throwable $e) {
+            return redirect()->back()->withErrors(['error' => 'Failed to update instructor status: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get instructor members
+     */
+    public function instructorMembers($id)
+    {
+        $instructor = User::where('role', 'instructor')->findOrFail($id);
+        $members = User::where('role', 'member')
+            ->where('instructor_id', $id)
+            ->get();
+
+        return view('admin.instructors.members', compact('instructor', 'members'));
     }
 }

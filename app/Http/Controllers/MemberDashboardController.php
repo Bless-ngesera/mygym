@@ -13,17 +13,16 @@ use App\Models\Message;
 use App\Models\WorkoutExercise;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\Booking;
+use App\Models\ScheduledClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class MemberDashboardController extends Controller
 {
-    /**
-     * Show the member dashboard with all statistics and data
-     */
     public function index()
     {
         $user = Auth::user();
@@ -50,7 +49,7 @@ class MemberDashboardController extends Controller
             ->whereDate('date', today())
             ->first();
 
-        // Upcoming workouts
+        // Upcoming workouts (for display)
         $upcomingWorkouts = Workout::where('user_id', $user->id)
             ->whereDate('date', '>', today())
             ->where('status', '!=', 'completed')
@@ -58,11 +57,52 @@ class MemberDashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // Current attendance
-        $currentAttendance = Attendance::where('user_id', $user->id)
-            ->whereDate('check_in', today())
-            ->whereNull('check_out')
-            ->first();
+        // Upcoming workouts count (for stats card)
+        $upcomingWorkoutsCount = Workout::where('user_id', $user->id)
+            ->whereDate('date', '>', today())
+            ->where('status', '!=', 'completed')
+            ->count();
+
+        // Upcoming classes count - correctly count only future classes the user has booked
+        $upcomingClassesCount = 0;
+        try {
+            // Check if bookings table exists
+            if (Schema::hasTable('bookings')) {
+                // Check if scheduled_classes table exists for joining
+                if (Schema::hasTable('scheduled_classes')) {
+                    // Get count of upcoming classes through the scheduled_classes relationship
+                    $upcomingClassesCount = Booking::where('bookings.user_id', $user->id)
+                        ->where('bookings.status', 'confirmed')
+                        ->join('scheduled_classes', 'bookings.scheduled_class_id', '=', 'scheduled_classes.id')
+                        ->where('scheduled_classes.date_time', '>=', Carbon::now())
+                        ->count();
+                }
+                // Alternative: if bookings has direct date column
+                elseif (Schema::hasColumn('bookings', 'date')) {
+                    $upcomingClassesCount = Booking::where('user_id', $user->id)
+                        ->where('status', 'confirmed')
+                        ->whereDate('date', '>=', today())
+                        ->count();
+                }
+                // Alternative: if bookings has scheduled_date column
+                elseif (Schema::hasColumn('bookings', 'scheduled_date')) {
+                    $upcomingClassesCount = Booking::where('user_id', $user->id)
+                        ->where('status', 'confirmed')
+                        ->whereDate('scheduled_date', '>=', today())
+                        ->count();
+                }
+                // Fallback: count only recent bookings (last 30 days)
+                else {
+                    $upcomingClassesCount = Booking::where('user_id', $user->id)
+                        ->where('status', 'confirmed')
+                        ->where('created_at', '>=', Carbon::now()->subDays(30))
+                        ->count();
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Error counting upcoming classes: ' . $e->getMessage());
+            $upcomingClassesCount = 0;
+        }
 
         // Active subscription
         $subscription = MemberSubscription::where('member_id', $user->id)
@@ -70,7 +110,6 @@ class MemberDashboardController extends Controller
             ->where('end_date', '>=', today())
             ->first();
 
-        // Add helper methods to subscription if it exists
         if ($subscription) {
             $subscription->daysRemaining = function() use ($subscription) {
                 return max(0, Carbon::now()->diffInDays($subscription->end_date, false));
@@ -92,104 +131,66 @@ class MemberDashboardController extends Controller
         $progressValues = $progressData->pluck('weight_kg')->toArray();
 
         // Today's nutrition
-        $todayNutrition = NutritionLog::where('user_id', $user->id)
-            ->whereDate('date', today())
-            ->first();
-
+        $todayNutrition = NutritionLog::where('user_id', $user->id)->whereDate('date', today())->first();
         if (!$todayNutrition) {
-            $todayNutrition = new NutritionLog([
-                'user_id' => $user->id,
-                'date' => today(),
-                'calories' => 0,
-                'protein_grams' => 0,
-                'carbs_grams' => 0,
-                'fat_grams' => 0
-            ]);
+            $todayNutrition = new NutritionLog(['user_id' => $user->id, 'date' => today(), 'calories' => 0, 'protein_grams' => 0, 'carbs_grams' => 0, 'fat_grams' => 0]);
         }
 
         // Notifications
-        $unreadNotificationsCount = Notification::where('user_id', $user->id)
-            ->where('read', false)
-            ->count();
+        $unreadNotificationsCount = Notification::where('user_id', $user->id)->where('read', false)->count();
 
-        $recentNotifications = Notification::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
-
-        // Instructor
+        // Instructor (assigned trainer)
         $instructor = null;
         if ($user->instructor_id) {
             $instructor = User::find($user->instructor_id);
         }
 
-        if (!$instructor) {
-            $instructor = User::where('role', 'instructor')->first();
-        }
-
-        // Recent messages with instructor
+        // Recent messages with instructor (ordered by pinned first, then by created_at)
         $recentMessages = collect();
         if ($instructor) {
             $recentMessages = Message::where(function($query) use ($user, $instructor) {
-                    $query->where('sender_id', $user->id)
-                          ->where('receiver_id', $instructor->id);
+                    $query->where('sender_id', $user->id)->where('receiver_id', $instructor->id);
                 })->orWhere(function($query) use ($user, $instructor) {
-                    $query->where('sender_id', $instructor->id)
-                          ->where('receiver_id', $user->id);
+                    $query->where('sender_id', $instructor->id)->where('receiver_id', $user->id);
                 })
-                ->orderBy('created_at', 'desc')
-                ->limit(50)
-                ->get()
-                ->reverse();
-        }
-
-        // Workout frequency for charts
-        $workoutFrequency = Workout::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->whereDate('date', '>=', now()->subDays(30))
-            ->select(DB::raw('DATE(date) as date'), DB::raw('count(*) as count'))
-            ->groupBy('date')
-            ->orderBy('date', 'asc')
-            ->get();
-
-        // Paginated workout history
-        $workoutHistory = Workout::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->orderBy('date', 'desc')
-            ->paginate(10);
-
-        // Paginated attendance history
-        $attendanceHistory = Attendance::where('user_id', $user->id)
-            ->whereNotNull('check_out')
-            ->orderBy('check_in', 'desc')
-            ->paginate(10);
-
-        // Paginated payment history
-        $paymentHistory = Payment::where('member_id', $user->id)
-            ->orderBy('paid_at', 'desc')
-            ->paginate(10);
-
-        // Workout templates - get regular workouts that can be used as templates
-        $workoutTemplates = Workout::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->limit(10)
-            ->get();
-
-        // If no completed workouts, get any workouts
-        if ($workoutTemplates->isEmpty()) {
-            $workoutTemplates = Workout::where('user_id', $user->id)
-                ->limit(5)
+                ->orderBy('is_pinned', 'desc')
+                ->orderBy('created_at', 'asc')
                 ->get();
         }
 
-        // Statistics
+        // Workout templates for scheduling
+        $workoutTemplates = Workout::where('user_id', $user->id)->where('status', 'completed')->limit(10)->get();
+        if ($workoutTemplates->isEmpty()) {
+            $workoutTemplates = Workout::where('user_id', $user->id)->limit(5)->get();
+        }
+
+        // Stats
         $stats = [
             'total_workouts' => $totalWorkouts,
             'completed_workouts' => $completedWorkouts,
             'total_hours' => floor(Attendance::where('user_id', $user->id)->sum('duration_minutes') / 60),
             'current_streak' => $currentStreak,
-            'total_calories_burned' => Workout::where('user_id', $user->id)->where('status', 'completed')->sum('duration_minutes') * 8,
+            'total_calories_burned' => Workout::where('user_id', $user->id)->where('status', 'completed')->sum('calories_burn') ?? 0,
         ];
+
+        $checkedInToday = Attendance::where('user_id', $user->id)->whereDate('check_in', today())->exists();
+
+        // Available trainers for selection
+        $availableTrainers = User::where('role', 'instructor')
+            ->where('id', '!=', $user->instructor_id ?? 0)
+            ->take(10)
+            ->get();
+
+        // Nutrition targets (can be customized per user)
+        $user_nutrition_targets = [
+            'calories' => $user->calorie_target ?? 2500,
+            'protein' => $user->protein_target ?? 150,
+            'carbs' => $user->carbs_target ?? 300,
+            'fat' => $user->fat_target ?? 80
+        ];
+
+        // Recent achievements (if you have an achievements table)
+        $recentAchievements = collect();
 
         return view('member.dashboard', compact(
             'totalWorkouts',
@@ -201,129 +202,95 @@ class MemberDashboardController extends Controller
             'bestStreak',
             'todayWorkout',
             'upcomingWorkouts',
-            'currentAttendance',
+            'upcomingWorkoutsCount',
+            'upcomingClassesCount',
             'subscription',
-            'progressData',
             'progressLabels',
             'progressValues',
             'todayNutrition',
             'unreadNotificationsCount',
-            'recentNotifications',
             'instructor',
             'recentMessages',
-            'workoutFrequency',
-            'attendanceHistory',
-            'paymentHistory',
             'stats',
-            'workoutHistory',
-            'workoutTemplates'
+            'workoutTemplates',
+            'checkedInToday',
+            'user',
+            'availableTrainers',
+            'user_nutrition_targets',
+            'recentAchievements'
         ));
     }
 
-    /**
-     * Calculate current workout streak
-     */
     private function calculateCurrentStreak()
     {
         $userId = Auth::id();
         $streak = 0;
         $currentDate = now()->startOfDay();
-
         while (true) {
-            $hasWorkout = Workout::where('user_id', $userId)
-                ->whereDate('date', $currentDate)
-                ->where('status', 'completed')
-                ->exists();
-
-            if (!$hasWorkout) {
-                break;
-            }
-
+            $hasWorkout = Workout::where('user_id', $userId)->whereDate('date', $currentDate)->where('status', 'completed')->exists();
+            if (!$hasWorkout) break;
             $streak++;
             $currentDate->subDay();
         }
-
         return $streak;
     }
 
-    /**
-     * Calculate best workout streak
-     */
     private function calculateBestStreak()
     {
         $userId = Auth::id();
-
-        $logs = Workout::where('user_id', $userId)
-            ->where('status', 'completed')
-            ->select(DB::raw('DATE(date) as workout_date'))
-            ->distinct()
-            ->orderBy('workout_date', 'asc')
-            ->get();
-
+        $logs = Workout::where('user_id', $userId)->where('status', 'completed')->select(DB::raw('DATE(date) as workout_date'))->distinct()->orderBy('workout_date', 'asc')->get();
         $best = 0;
         $current = 0;
         $lastDate = null;
-
         foreach ($logs as $log) {
             $logDate = Carbon::parse($log->workout_date)->startOfDay();
-
             if ($lastDate && $logDate->diffInDays($lastDate) == 1) {
                 $current++;
             } else {
                 $current = 1;
             }
-
             $best = max($best, $current);
             $lastDate = $logDate;
         }
-
         return $best;
     }
 
-    /**
-     * Calculate workout increase percentage
-     */
     private function calculateWorkoutIncrease()
     {
         $userId = Auth::id();
-
-        $lastMonth = Workout::where('user_id', $userId)
-            ->where('status', 'completed')
-            ->whereDate('date', '>=', now()->subMonth())
-            ->count();
-
-        $previousMonth = Workout::where('user_id', $userId)
-            ->where('status', 'completed')
-            ->whereDate('date', '>=', now()->subMonths(2))
-            ->whereDate('date', '<', now()->subMonth())
-            ->count();
-
+        $lastMonth = Workout::where('user_id', $userId)->where('status', 'completed')->whereDate('date', '>=', now()->subMonth())->count();
+        $previousMonth = Workout::where('user_id', $userId)->where('status', 'completed')->whereDate('date', '>=', now()->subMonths(2))->whereDate('date', '<', now()->subMonth())->count();
         if ($previousMonth == 0) return 100;
         return round((($lastMonth - $previousMonth) / $previousMonth) * 100);
     }
 
-    /**
-     * Schedule a new workout
-     */
     public function scheduleWorkout(Request $request)
     {
         $validated = $request->validate([
             'workout_template_id' => 'required|exists:workouts,id',
-            'scheduled_at' => 'required|date|after:now'
+            'scheduled_date' => 'required|date|after_or_equal:today',
+            'scheduled_time' => 'nullable|date_format:H:i'
         ]);
 
+        $scheduledDateTime = $validated['scheduled_date'];
+        if (!empty($validated['scheduled_time'])) {
+            $scheduledDateTime .= ' ' . $validated['scheduled_time'];
+        }
+        $scheduledDateTime = Carbon::parse($scheduledDateTime);
+
         $template = Workout::find($validated['workout_template_id']);
+        $estimatedCalories = ($template->duration_minutes ?? 45) * 8;
 
         $workout = Workout::create([
             'user_id' => Auth::id(),
             'title' => $template->title,
             'description' => $template->description,
-            'duration' => $template->duration,
-            'date' => $validated['scheduled_at'],
+            'duration_minutes' => $template->duration_minutes ?? 45,
+            'calories_burn' => $template->calories_burn ?? $estimatedCalories,
+            'date' => $scheduledDateTime->format('Y-m-d'),
             'status' => 'scheduled'
         ]);
 
-        // Copy exercises from template
         if ($template->exercises && $template->exercises->count() > 0) {
             foreach ($template->exercises as $exercise) {
                 $workout->exercises()->attach($exercise->id, [
@@ -340,48 +307,20 @@ class MemberDashboardController extends Controller
             'user_id' => Auth::id(),
             'type' => 'workout',
             'title' => 'Workout Scheduled',
-            'message' => 'Your workout "' . $workout->title . '" has been scheduled for ' . Carbon::parse($validated['scheduled_at'])->format('M d, h:i A'),
+            'message' => 'Your workout "' . $workout->title . '" has been scheduled for ' . $scheduledDateTime->format('M d, h:i A'),
             'data' => json_encode(['workout_id' => $workout->id])
         ]);
 
         return response()->json(['success' => true, 'workout' => $workout]);
     }
 
-    /**
-     * Start a workout
-     */
-    public function startWorkout(Workout $workout)
-    {
-        if ($workout->user_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $workout->update([
-            'status' => 'in_progress',
-            'started_at' => now()
-        ]);
-
-        Notification::create([
-            'user_id' => Auth::id(),
-            'type' => 'workout',
-            'title' => 'Workout Started',
-            'message' => 'You started "' . $workout->title . '". Good luck! 💪',
-            'data' => json_encode(['workout_id' => $workout->id])
-        ]);
-
-        return response()->json(['success' => true]);
-    }
-
-    /**
-     * Complete a workout
-     */
     public function completeWorkout(Workout $workout)
     {
         if ($workout->user_id !== Auth::id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $duration = $workout->started_at ? now()->diffInMinutes($workout->started_at) : $workout->duration;
+        $duration = $workout->started_at ? now()->diffInMinutes($workout->started_at) : ($workout->duration_minutes ?? 45);
 
         $workout->update([
             'status' => 'completed',
@@ -389,11 +328,7 @@ class MemberDashboardController extends Controller
             'duration_minutes' => $duration
         ]);
 
-        // Update goals progress
-        Goal::where('user_id', Auth::id())
-            ->where('type', 'workouts')
-            ->where('status', 'active')
-            ->increment('current_value', 1);
+        Goal::where('user_id', Auth::id())->where('type', 'workouts')->where('status', 'active')->increment('current_value', 1);
 
         Notification::create([
             'user_id' => Auth::id(),
@@ -406,44 +341,6 @@ class MemberDashboardController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Reschedule a workout
-     */
-    public function rescheduleWorkout(Request $request, Workout $workout)
-    {
-        if ($workout->user_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $validated = $request->validate([
-            'scheduled_at' => 'required|date|after:now'
-        ]);
-
-        $workout->update([
-            'date' => $validated['scheduled_at'],
-            'status' => 'scheduled'
-        ]);
-
-        return response()->json(['success' => true]);
-    }
-
-    /**
-     * Cancel a workout
-     */
-    public function cancelWorkout(Workout $workout)
-    {
-        if ($workout->user_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $workout->update(['status' => 'cancelled']);
-
-        return response()->json(['success' => true]);
-    }
-
-    /**
-     * Complete a specific exercise in a workout
-     */
     public function completeExercise(WorkoutExercise $workoutExercise)
     {
         if ($workoutExercise->workout->user_id !== Auth::id()) {
@@ -452,11 +349,7 @@ class MemberDashboardController extends Controller
 
         $workoutExercise->update(['completed' => true]);
 
-        // Check if all exercises are completed
-        $allCompleted = $workoutExercise->workout->exercises()
-            ->wherePivot('completed', false)
-            ->count() === 0;
-
+        $allCompleted = $workoutExercise->workout->exercises()->wherePivot('completed', false)->count() === 0;
         if ($allCompleted && $workoutExercise->workout->status !== 'completed') {
             $this->completeWorkout($workoutExercise->workout);
         }
@@ -464,27 +357,15 @@ class MemberDashboardController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Check in to the gym
-     */
     public function checkIn()
     {
         $user = Auth::user();
-
-        $existing = Attendance::where('user_id', $user->id)
-            ->whereDate('check_in', today())
-            ->whereNull('check_out')
-            ->first();
-
+        $existing = Attendance::where('user_id', $user->id)->whereDate('check_in', today())->whereNull('check_out')->first();
         if ($existing) {
             return response()->json(['error' => 'You are already checked in'], 400);
         }
 
-        $attendance = Attendance::create([
-            'user_id' => $user->id,
-            'check_in' => now(),
-            'status' => 'checked_in'
-        ]);
+        $attendance = Attendance::create(['user_id' => $user->id, 'check_in' => now(), 'status' => 'checked_in']);
 
         Notification::create([
             'user_id' => $user->id,
@@ -497,98 +378,6 @@ class MemberDashboardController extends Controller
         return response()->json(['success' => true, 'message' => 'Checked in successfully']);
     }
 
-    /**
-     * Check out from the gym
-     */
-    public function checkOut()
-    {
-        $user = Auth::user();
-
-        $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('check_in', today())
-            ->whereNull('check_out')
-            ->first();
-
-        if (!$attendance) {
-            return response()->json(['error' => 'No active check-in found'], 400);
-        }
-
-        $duration = now()->diffInMinutes($attendance->check_in);
-
-        $attendance->update([
-            'check_out' => now(),
-            'duration_minutes' => $duration,
-            'status' => 'checked_out'
-        ]);
-
-        // Update goal progress
-        Goal::where('user_id', $user->id)
-            ->where('type', 'attendance')
-            ->where('status', 'active')
-            ->increment('current_value', 1);
-
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'attendance',
-            'title' => 'Checked Out Successfully',
-            'message' => 'Great workout! You were here for ' . $duration . ' minutes.',
-            'data' => json_encode(['attendance_id' => $attendance->id])
-        ]);
-
-        return response()->json(['success' => true, 'message' => 'Checked out successfully']);
-    }
-
-    /**
-     * Add nutrition log
-     */
-    public function addNutrition(Request $request)
-    {
-        $validated = $request->validate([
-            'calories' => 'required|integer|min:0|max:10000',
-            'protein_grams' => 'nullable|numeric|min:0|max:500',
-            'carbs_grams' => 'nullable|numeric|min:0|max:500',
-            'fat_grams' => 'nullable|numeric|min:0|max:200',
-        ]);
-
-        $nutrition = NutritionLog::firstOrCreate([
-            'user_id' => Auth::id(),
-            'date' => today(),
-        ]);
-
-        $nutrition->update([
-            'calories' => ($nutrition->calories ?? 0) + $validated['calories'],
-            'protein_grams' => ($nutrition->protein_grams ?? 0) + ($validated['protein_grams'] ?? 0),
-            'carbs_grams' => ($nutrition->carbs_grams ?? 0) + ($validated['carbs_grams'] ?? 0),
-            'fat_grams' => ($nutrition->fat_grams ?? 0) + ($validated['fat_grams'] ?? 0),
-        ]);
-
-        return response()->json(['success' => true, 'nutrition' => $nutrition]);
-    }
-
-    /**
-     * Get today's nutrition
-     */
-    public function getTodayNutrition()
-    {
-        $nutrition = NutritionLog::where('user_id', Auth::id())
-            ->whereDate('date', today())
-            ->first();
-
-        if (!$nutrition) {
-            $nutrition = new NutritionLog([
-                'calories' => 0,
-                'protein_grams' => 0,
-                'carbs_grams' => 0,
-                'fat_grams' => 0
-            ]);
-        }
-
-        return response()->json(['success' => true, 'nutrition' => $nutrition]);
-    }
-
-    /**
-     * Log weight progress
-     */
     public function addProgress(Request $request)
     {
         $validated = $request->validate([
@@ -597,25 +386,13 @@ class MemberDashboardController extends Controller
         ]);
 
         $progress = ProgressLog::updateOrCreate(
-            [
-                'user_id' => Auth::id(),
-                'date' => $validated['date']
-            ],
+            ['user_id' => Auth::id(), 'date' => $validated['date']],
             ['weight_kg' => $validated['weight_kg']]
         );
-
-        // Update weight loss goal
-        Goal::where('user_id', Auth::id())
-            ->where('type', 'weight')
-            ->where('status', 'active')
-            ->update(['current_value' => $validated['weight_kg']]);
 
         return response()->json(['success' => true, 'progress' => $progress]);
     }
 
-    /**
-     * Create a new goal
-     */
     public function createGoal(Request $request)
     {
         $validated = $request->validate([
@@ -640,21 +417,26 @@ class MemberDashboardController extends Controller
         return response()->json(['success' => true, 'goal' => $goal]);
     }
 
-    /**
-     * Get all goals
-     */
-    public function getGoals()
+    public function addNutrition(Request $request)
     {
-        $goals = Goal::where('user_id', Auth::id())
-            ->where('status', 'active')
-            ->get();
+        $validated = $request->validate([
+            'calories' => 'required|integer|min:0|max:10000',
+            'protein_grams' => 'nullable|numeric|min:0|max:500',
+            'carbs_grams' => 'nullable|numeric|min:0|max:500',
+            'fat_grams' => 'nullable|numeric|min:0|max:200',
+        ]);
 
-        return response()->json(['success' => true, 'goals' => $goals]);
+        $nutrition = NutritionLog::firstOrCreate(['user_id' => Auth::id(), 'date' => today()]);
+        $nutrition->update([
+            'calories' => ($nutrition->calories ?? 0) + $validated['calories'],
+            'protein_grams' => ($nutrition->protein_grams ?? 0) + ($validated['protein_grams'] ?? 0),
+            'carbs_grams' => ($nutrition->carbs_grams ?? 0) + ($validated['carbs_grams'] ?? 0),
+            'fat_grams' => ($nutrition->fat_grams ?? 0) + ($validated['fat_grams'] ?? 0),
+        ]);
+
+        return response()->json(['success' => true, 'nutrition' => $nutrition]);
     }
 
-    /**
-     * Send a message to instructor
-     */
     public function sendMessage(Request $request)
     {
         $validated = $request->validate([
@@ -681,7 +463,75 @@ class MemberDashboardController extends Controller
     }
 
     /**
-     * Get messages with instructor
+     * Delete a message
+     */
+    public function deleteMessage(Message $message)
+    {
+        if ($message->sender_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $message->delete();
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
+        return redirect()->back()->with('success', 'Message deleted successfully');
+    }
+
+    /**
+     * Update a message
+     */
+    public function updateMessage(Request $request, Message $message)
+    {
+        if ($message->sender_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'message' => 'required|string|max:1000'
+        ]);
+
+        $message->update([
+            'message' => $validated['message'],
+            'edited_at' => now(),
+            'is_edited' => true
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->back()->with('success', 'Message updated successfully');
+    }
+
+    /**
+     * Pin/unpin a message
+     */
+    public function pinMessage(Message $message)
+    {
+        // Both sender and receiver can pin messages
+        if ($message->receiver_id !== Auth::id() && $message->sender_id !== Auth::id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $isPinning = !$message->is_pinned;
+
+        $message->update([
+            'is_pinned' => $isPinning,
+            'pinned_at' => $isPinning ? now() : null
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json(['success' => true, 'is_pinned' => $message->is_pinned]);
+        }
+
+        return redirect()->back()->with('success', $isPinning ? 'Message pinned' : 'Message unpinned');
+    }
+
+    /**
+     * Get messages with instructor (for AJAX)
      */
     public function getMessages($userId)
     {
@@ -702,6 +552,80 @@ class MemberDashboardController extends Controller
             ->update(['read' => true, 'read_at' => now()]);
 
         return response()->json(['success' => true, 'messages' => $messages]);
+    }
+
+    public function selectTrainer(Request $request)
+    {
+        $validated = $request->validate(['trainer_id' => 'required|exists:users,id']);
+        $trainer = User::find($validated['trainer_id']);
+
+        if ($trainer->role !== 'instructor') {
+            return response()->json(['error' => 'Invalid trainer selected'], 400);
+        }
+
+        $user = Auth::user();
+        $user->instructor_id = $trainer->id;
+        $user->save();
+
+        Message::create([
+            'sender_id' => $trainer->id,
+            'receiver_id' => $user->id,
+            'message' => "Hello {$user->name}! I'm your new personal trainer. I'm excited to help you achieve your fitness goals! 💪",
+            'read' => false,
+        ]);
+
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'trainer',
+            'title' => 'New Personal Trainer Assigned',
+            'message' => "{$trainer->name} is now your personal trainer. Send them a message to get started!",
+            'data' => json_encode(['trainer_id' => $trainer->id])
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function getWorkoutDetails($workoutId)
+    {
+        try {
+            $workout = Workout::with('exercises')->where('user_id', Auth::id())->findOrFail($workoutId);
+            return response()->json([
+                'success' => true,
+                'workout' => [
+                    'id' => $workout->id,
+                    'title' => $workout->title,
+                    'description' => $workout->description,
+                    'date' => $workout->date ? Carbon::parse($workout->date)->format('F j, Y') : null,
+                    'duration' => $workout->duration_minutes,
+                    'calories_burn' => $workout->calories_burn,
+                    'exercises' => $workout->exercises->map(function ($exercise) {
+                        return [
+                            'name' => $exercise->name,
+                            'pivot' => ['sets' => $exercise->pivot->sets ?? null, 'reps' => $exercise->pivot->reps ?? null, 'weight_kg' => $exercise->pivot->weight_kg ?? null]
+                        ];
+                    }),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Workout not found'], 404);
+        }
+    }
+
+    public function workoutHistory()
+    {
+        $workouts = Workout::where('user_id', Auth::id())->where('status', 'completed')->orderBy('date', 'desc')->paginate(20);
+        $totalMinutes = Workout::where('user_id', Auth::id())->where('status', 'completed')->sum('duration_minutes');
+        $totalCalories = Workout::where('user_id', Auth::id())->where('status', 'completed')->sum('calories_burn');
+        return view('member.workouts.history', compact('workouts', 'totalMinutes', 'totalCalories'));
+    }
+
+    public function getWorkoutTemplates()
+    {
+        $templates = Workout::where('user_id', Auth::id())->where('status', 'completed')->limit(10)->get();
+        if ($templates->isEmpty()) {
+            $templates = Workout::where('user_id', Auth::id())->limit(5)->get();
+        }
+        return response()->json(['success' => true, 'templates' => $templates]);
     }
 
     /**
@@ -827,80 +751,5 @@ class MemberDashboardController extends Controller
         else {
             return "I'm here to help with your fitness journey, " . ($user->name ?? 'friend') . "! 💪\n\nYou can ask me about:\n• \"Workout for beginners\"\n• \"Healthy meal ideas\" \n• \"How to stay motivated\"\n• \"Track my progress\"\n• \"Cardio routine\"\n• \"Recovery tips\"\n\nWhat specific fitness goal can I help you with today?";
         }
-    }
-
-    /**
-     * Get workout history (paginated)
-     */
-    public function workoutHistory()
-    {
-        $workouts = Workout::where('user_id', Auth::id())
-            ->where('status', 'completed')
-            ->orderBy('date', 'desc')
-            ->paginate(20);
-
-        return view('member.workouts.history', compact('workouts'));
-    }
-
-    /**
-     * Get upcoming workouts
-     */
-    public function upcomingWorkouts()
-    {
-        $workouts = Workout::where('user_id', Auth::id())
-            ->where('status', 'scheduled')
-            ->whereDate('date', '>=', today())
-            ->orderBy('date', 'asc')
-            ->paginate(20);
-
-        return view('member.workouts.upcoming', compact('workouts'));
-    }
-
-    /**
-     * Get workout templates
-     */
-    public function getWorkoutTemplates()
-    {
-        // Get completed workouts to use as templates
-        $templates = Workout::where('user_id', Auth::id())
-            ->where('status', 'completed')
-            ->limit(10)
-            ->get();
-
-        if ($templates->isEmpty()) {
-            $templates = Workout::where('user_id', Auth::id())
-                ->limit(5)
-                ->get();
-        }
-
-        return response()->json(['success' => true, 'templates' => $templates]);
-    }
-
-    /**
-     * Mark notification as read
-     */
-    public function markNotificationRead($notificationId)
-    {
-        $notification = Notification::where('user_id', Auth::id())
-            ->findOrFail($notificationId);
-
-        $notification->update([
-            'read' => true,
-            'read_at' => now()
-        ]);
-
-        return response()->json(['success' => true]);
-    }
-
-    /**
-     * Mark all notifications as read
-     */
-    public function markAllNotificationsRead()
-    {
-        Notification::where('user_id', Auth::id())
-            ->where('read', false)
-            ->update(['read' => true, 'read_at' => now()]);
-
-        return response()->json(['success' => true]);
     }
 }

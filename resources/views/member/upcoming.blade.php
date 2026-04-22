@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                     My Bookings
@@ -290,12 +290,9 @@
                 {{-- Column 1: Logo/Brand Info --}}
                 <div class="col-span-2 md:col-span-1 lg:col-span-2">
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
+                        <div class="flex items-center">
+                            <img src="{{ asset('images/Project_Logo.png') }}" alt="Gym Logo" class="h-7 w-auto object-contain ml-1">
                         </div>
-                        <h4 class="text-2xl font-bold text-white tracking-wider">My<span class="text-purple-400">Gym</span></h4>
                     </div>
                     <p class="text-sm text-gray-400 leading-relaxed">
                         Train smart, stay consistent, and celebrate your growth. We're a community rooted in African strength and unity.
@@ -321,27 +318,29 @@
                         <li><a href="{{ route('classes.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Browse Classes</a></li>
                         <li><a href="{{ route('member.bookings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">My Bookings</a></li>
                         <li><a href="{{ route('profile.edit') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Manage Profile</a></li>
+                        <li><a href="{{ route('plans.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Membership Plans</a></li>
                     </ul>
                 </div>
 
-                {{-- Column 3: Classes --}}
+                {{-- Column 3: Popular Classes --}}
                 <div>
                     <h5 class="text-lg font-semibold text-white mb-4">Popular Classes</h5>
                     <ul class="space-y-3">
-                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Pilates</a></li>
-                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Yoga</a></li>
-                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Dance Fitness</a></li>
-                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">Boxing</a></li>
+                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🧘 Yoga</a></li>
+                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💪 HIIT</a></li>
+                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💃 Zumba</a></li>
+                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🥊 Boxing</a></li>
+                        <li><a href="#" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🧘 Pilates</a></li>
                     </ul>
                 </div>
 
-                {{-- Column 4: Contact Info --}}
+                {{-- Column 4: Contact & Support --}}
                 <div class="col-span-2 md:col-span-1">
                     <h5 class="text-lg font-semibold text-white mb-4">Get In Touch</h5>
                     <ul class="space-y-3 text-sm text-gray-400">
                         <li class="flex items-start">
                             <span class="mr-2 text-purple-400">📍</span>
-                            <span>Ggaba road, Kampala, UGANDA</span>
+                            <span>Ggaba Road, Kampala, UGANDA</span>
                         </li>
                         <li class="flex items-start">
                             <span class="mr-2 text-purple-400">📞</span>
@@ -352,14 +351,30 @@
                             <span><a href="mailto:info@mygym.com" class="hover:text-purple-400">info@mygym.com</a></span>
                         </li>
                     </ul>
+                    <div class="mt-6">
+                        <h5 class="text-sm font-semibold text-white mb-2">Support Hours</h5>
+                        <p class="text-xs text-gray-400">Mon-Fri: 9AM - 6PM</p>
+                        <p class="text-xs text-gray-400">Sat: 10AM - 4PM</p>
+                        <p class="text-xs text-gray-400">Sun: Closed</p>
+                    </div>
                 </div>
             </div>
 
-            {{-- Copyright Section --}}
-            <div class="mt-12 pt-8 border-t border-purple-500/30 text-center">
-                <p class="text-sm text-gray-500">
-                    &copy; {{ date('Y') }} MyGym. All rights reserved. Powered by Passion.
-                </p>
+            {{-- Copyright Section with Links --}}
+            <div class="mt-12 pt-8 border-t border-purple-500/30">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex gap-6">
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">About Us</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Terms of Service</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Privacy Policy</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Cookie Policy</a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p class="text-sm text-gray-500">
+                            &copy; {{ date('Y') }} MyGym. All rights reserved. Powered by Passion.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </footer>

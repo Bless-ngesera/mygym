@@ -24,21 +24,22 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 flex-wrap">
                 <a href="{{ route('admin.members.create') }}"
-                   class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+                   class="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                     </svg>
-                    Add Member
+                    <span class="hidden sm:inline">Add Member</span>
+                    <span class="sm:hidden">Add</span>
                 </a>
                 <a href="{{ route('admin.dashboard') }}"
-                   class="px-4 py-2 bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-all duration-200 border border-gray-200">
+                   class="px-3 sm:px-4 py-2 bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-all duration-200 border border-gray-200">
                     <span class="flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                         </svg>
-                        Dashboard
+                        <span class="hidden sm:inline">Dashboard</span>
                     </span>
                 </a>
             </div>
@@ -232,17 +233,17 @@
                             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Members</h1>
                             <p class="text-sm text-gray-500 mt-1">All registered gym members</p>
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                             <div class="relative">
                                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
                                 <input id="member-search" type="search"
                                        placeholder="Search members..."
-                                       class="pl-10 pr-4 py-2 bg-white/80 border border-gray-200 rounded-xl text-sm w-64 focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition-all" />
+                                       class="pl-10 pr-4 py-2 bg-white/80 border border-gray-200 rounded-xl text-sm w-full sm:w-64 focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition-all" />
                             </div>
                             <a href="{{ route('admin.members.create') }}"
-                               class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+                               class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                                 </svg>
@@ -254,14 +255,13 @@
                     {{-- Members Table --}}
                     <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden">
                         {{-- Table Header --}}
-                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                             <div>
                                 <h3 class="font-bold text-gray-900 text-sm">All Members</h3>
                                 <p class="text-xs text-gray-400 mt-0.5">Registered gym members</p>
                             </div>
-                            <div class="flex items-center gap-3">
-                                {{-- Pagination Info - Exactly like the picture --}}
-                                <div class="text-sm text-gray-600">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <div class="text-sm text-gray-600 hidden sm:block">
                                     Showing <span class="font-medium">{{ $members->firstItem() ?? 0 }}</span>
                                     to <span class="font-medium">{{ $members->lastItem() ?? 0 }}</span>
                                     of <span class="font-medium">{{ $members->total() ?? 0 }}</span> results
@@ -277,43 +277,43 @@
                             <table class="min-w-full">
                                 <thead>
                                     <tr class="bg-gray-50/80 border-b border-gray-100">
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                                        <th class="px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th class="hidden sm:table-cell px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</th>
+                                        <th class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                                        <th class="px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-50">
                                     @forelse($members as $member)
                                         <tr class="hover:bg-emerald-50/30 transition-colors duration-150">
-                                            <td class="px-6 py-4">
-                                                <div class="flex items-center gap-3">
+                                            <td class="px-3 py-3 sm:px-6 sm:py-4">
+                                                <div class="flex items-center gap-2 sm:gap-3">
                                                     <img src="{{ $member->photo_url ?? 'https://ui-avatars.com/api/?name='.urlencode($member->name).'&background=10b981&color=fff&bold=true' }}"
-                                                         alt="" class="w-8 h-8 rounded-lg ring-2 ring-emerald-200">
-                                                    <div>
-                                                        <div class="text-sm font-semibold text-gray-800">{{ $member->name }}</div>
+                                                         alt="" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg ring-2 ring-emerald-200 flex-shrink-0">
+                                                    <div class="min-w-0">
+                                                        <div class="text-sm font-semibold text-gray-800 truncate">{{ $member->name }}</div>
                                                         @if(isset($member->membership_type))
                                                             <span class="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{{ $member->membership_type }}</span>
                                                         @endif
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">{{ $member->email }}</td>
-                                            <td class="px-6 py-4">
+                                            <td class="hidden sm:table-cell px-3 py-3 sm:px-6 sm:py-4 text-sm text-gray-600">{{ $member->email }}</td>
+                                            <td class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4">
                                                 <span class="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
                                                     {{ $member->plan->name ?? 'Basic Plan' }}
                                                 </span>
                                             </td>
-                                            <td class="px-6 py-4">
+                                            <td class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4">
                                                 <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
                                                     {{ $member->created_at->format('M d, Y') }}
                                                 </span>
                                             </td>
-                                            <td class="px-6 py-4">
-                                                <div class="flex items-center gap-2">
+                                            <td class="px-3 py-3 sm:px-6 sm:py-4">
+                                                <div class="flex items-center gap-1 sm:gap-2">
                                                     <a href="{{ route('admin.members.edit', $member->id) }}"
-                                                       class="inline-flex items-center text-xs font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                       class="inline-flex items-center text-xs font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 sm:px-3 py-1.5 rounded-lg transition-colors">
                                                         Edit
                                                     </a>
                                                     <form action="{{ route('admin.members.destroy', $member->id) }}"
@@ -322,7 +322,7 @@
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit"
-                                                                class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                                class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 sm:px-3 py-1.5 rounded-lg transition-colors">
                                                             Delete
                                                         </button>
                                                     </form>
@@ -353,8 +353,8 @@
 
                         {{-- Pagination Links - Exactly like the picture --}}
                         @if($members->hasPages())
-                            <div class="px-6 py-4 border-t border-gray-100">
-                                <div class="flex items-center justify-between">
+                            <div class="px-4 sm:px-6 py-4 border-t border-gray-100">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div class="text-sm text-gray-600">
                                         Showing <span class="font-medium">{{ $members->firstItem() ?? 0 }}</span>
                                         to <span class="font-medium">{{ $members->lastItem() ?? 0 }}</span>
@@ -395,6 +395,106 @@
             </div>
         </main>
     </div>
+            <footer class="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-purple-500/30">
+            <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
+                    {{-- Column 1: Logo/Brand Info --}}
+                    <div class="col-span-2 md:col-span-1 lg:col-span-2">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="flex items-center">
+                                <img src="{{ asset('images/Project_Logo.png') }}" alt="Gym Logo" class="h-7 w-auto object-contain ml-1">
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-400 leading-relaxed">
+                            Train smart, stay consistent, and celebrate your growth. We're a community rooted in African strength and unity.
+                        </p>
+                        <div class="flex space-x-4 mt-4">
+                            <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                                <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.77l-.44 2.89h-2.33v6.987A10 10 0 0022 12z" clip-rule="evenodd" /></svg>
+                            </a>
+                            <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                                <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12.315 2c2.43 0 2.715.01 3.67.058 1.036.05 1.745.21 2.37.456.684.276 1.258.74 1.717 1.259.46.52.825 1.094 1.102 1.717.246.625.407 1.334.456 2.37.048.955.058 1.23.058 3.67s-.01 2.715-.058 3.67c-.05.97-.21 1.745-.456 2.37-.276.684-.74 1.258-1.259 1.717-.52.46-1.094.825-1.717 1.102-.625.246-1.334.407-2.37.456-.955.048-1.23.058-3.67.058s-2.715-.01-3.67-.058c-.97-.05-1.745-.21-2.37-.456-.684-.276-1.258-.74-1.717-1.259-.46-.52-.825-1.094-1.102-1.717-.246-.625-.407-1.334-.456-2.37-.048-.955-.058-1.23-.058-3.67s.01-2.715.058-3.67c.05-.97.21-1.745.456-2.37.276-.684.74-1.258 1.259-1.717.46-.52 1.094-.825 1.717-1.102.625-.246 1.334-.407 2.37-.456C9.59 2.01 9.875 2 12.315 2zm0 1.637c-2.35 0-2.6.01-3.535.056-.983.05-1.503.21-1.85.347-.417.164-.78.384-1.095.698-.315.315-.534.678-.698 1.095-.137.347-.297.867-.347 1.85-.046.935-.056 1.185-.056 3.535s.01 2.6.056 3.535c.05.983.21 1.503.347 1.85.164.417.384.78.698 1.095.315.315.678.534 1.095.698.347.137.867.297 1.85.347.935.046 1.185.056 3.535.056s2.6-.01 3.535-.056c.983-.05 1.503-.21 1.85-.347.417-.164.78-.384 1.095-.698.315-.315.534-.678.698-1.095.137-.347.297-.867.347-1.85.046-.935.056-1.185.056-3.535s-.01-2.6-.056-3.535c-.05-.983-.21-1.503-.347-1.85-.164-.417-.384-.78-.698-1.095-.315-.315-.678-.534-1.095-.698-.347-.137-.867-.297-1.85-.347-.935-.046-1.185-.056-3.535-.056zM12.315 5.564c-3.714 0-6.75 3.036-6.75 6.75s3.036 6.75 6.75 6.75 6.75-3.036 6.75-6.75-3.036-6.75-6.75-6.75zm0 11.235c-2.476 0-4.485-2.009-4.485-4.485S9.839 7.828 12.315 7.828s4.485 2.009 4.485 4.485-2.009 4.485-4.485 4.485zm4.991-9.982c-.52 0-.942-.423-.942-.942s.422-.942.942-.942.942.423.942.942-.422.942-.942.942z" clip-rule="evenodd" /></svg>
+                            </a>
+                            <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                                <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    {{-- Column 2: Admin Quick Links --}}
+                    <div>
+                        <h5 class="text-lg font-semibold text-white mb-4">Admin Panel</h5>
+                        <ul class="space-y-3">
+                            <li><a href="{{ route('admin.dashboard') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📊 Dashboard</a></li>
+                            <li><a href="{{ route('admin.members.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">👥 Manage Members</a></li>
+                            <li><a href="{{ route('admin.instructors.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">👨‍🏫 Manage Instructors</a></li>
+                            <li><a href="{{ route('admin.earnings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💰 Earnings Overview</a></li>
+                            <li><a href="{{ route('admin.reports.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📈 Reports</a></li>
+                            <li><a href="{{ route('admin.settings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">⚙️ Settings</a></li>
+                        </ul>
+                    </div>
+
+                    {{-- Column 3: System Management --}}
+                    <div>
+                        <h5 class="text-lg font-semibold text-white mb-4">System</h5>
+                        <ul class="space-y-3">
+                            <li><a href="{{ route('admin.system.health') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🩺 System Health</a></li>
+                            <li><a href="{{ route('admin.system.logs') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📋 System Logs</a></li>
+                            <li><a href="{{ route('admin.database.backup') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💾 Database Backup</a></li>
+                            <li>
+                                <form method="POST" action="{{ route('admin.system.clear-cache') }}" class="inline" onsubmit="return confirm('Are you sure you want to clear the system cache?');">
+                                    @csrf
+                                    <button type="submit" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🗑️ Clear Cache</button>
+                                </form>
+                            </li>
+                            <li><a href="{{ route('admin.system.queue-status') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">⏳ Queue Status</a></li>
+                        </ul>
+                    </div>
+
+                    {{-- Column 4: Contact & Support --}}
+                    <div class="col-span-2 md:col-span-1">
+                        <h5 class="text-lg font-semibold text-white mb-4">Get In Touch</h5>
+                        <ul class="space-y-3 text-sm text-gray-400">
+                            <li class="flex items-start">
+                                <span class="mr-2 text-purple-400">📍</span>
+                                <span>Ggaba Road, Kampala, UGANDA</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="mr-2 text-purple-400">📞</span>
+                                <span>+256 700 123 456</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="mr-2 text-purple-400">📧</span>
+                                <span><a href="mailto:admin@mygym.com" class="hover:text-purple-400">admin@mygym.com</a></span>
+                            </li>
+                        </ul>
+                        <div class="mt-6">
+                            <h5 class="text-sm font-semibold text-white mb-2">Support Hours</h5>
+                            <p class="text-xs text-gray-400">Monday - Friday: 9AM - 6PM</p>
+                            <p class="text-xs text-gray-400">Saturday: 10AM - 4PM</p>
+                            <p class="text-xs text-gray-400">Sunday: Closed</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Copyright Section with Links --}}
+                <div class="mt-12 pt-8 border-t border-purple-500/30">
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex gap-6">
+                            <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">About Us</a>
+                            <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Terms of Service</a>
+                            <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Privacy Policy</a>
+                            <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Cookie Policy</a>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm text-gray-500">
+                                &copy; {{ date('Y') }} MyGym. All rights reserved. Powered by Passion.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

@@ -2,7 +2,6 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-4">
-                {{-- ✅ HAMBURGER — always visible, toggles sidebar on ALL screen sizes --}}
                 <button id="sidebarToggle"
                     class="p-2.5 rounded-xl hover:bg-gray-100 focus:outline-none transition-all duration-200 active:scale-95 border border-transparent hover:border-gray-200 cursor-pointer"
                     aria-label="Toggle sidebar">
@@ -24,38 +23,71 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 flex-wrap">
                 <a href="{{ route('admin.dashboard') }}"
-                   class="px-4 py-2 bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-all duration-200 border border-gray-200">
+                   class="px-3 sm:px-4 py-2 bg-gray-50 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-100 transition-all duration-200 border border-gray-200">
                     <span class="flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                         </svg>
-                        Dashboard
+                        <span class="hidden sm:inline">Dashboard</span>
                     </span>
                 </a>
                 <a href="{{ route('admin.instructors.create') }}"
-                   class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+                   class="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                     </svg>
-                    Register Instructor
+                    <span class="hidden sm:inline">Register Instructor</span>
+                    <span class="sm:hidden">Add</span>
                 </a>
             </div>
         </div>
     </x-slot>
 
+    {{-- Toast Notification Container --}}
+    <div id="toastContainer" class="fixed top-20 right-4 z-50 space-y-2"></div>
+
+    {{-- Delete Confirmation Modal --}}
+    <div id="deleteModal" class="fixed inset-0 z-[1100] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeDeleteModal()">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-95 opacity-0" id="deleteModalContent">
+            <div class="relative">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-600"></div>
+                <div class="p-6 text-center">
+                    <div class="mx-auto w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Delete Instructor?</h3>
+                    <p class="text-sm text-gray-500 mb-6">
+                        Are you sure you want to delete this instructor? This action cannot be undone.
+                    </p>
+                    <form id="deleteForm" method="POST" action="">
+                        @csrf
+                        @method('DELETE')
+                        <div class="flex gap-3">
+                            <button type="button" onclick="closeDeleteModal()"
+                                    class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
+                                Cancel
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-red-200 transition-all duration-200">
+                                Yes, Delete
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Sidebar Overlay --}}
-    <div id="sidebarOverlay"
-         class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[998] hidden"
-         style="top: 0;"></div>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[998] hidden" style="top: 0;"></div>
 
     {{-- Fixed Sidebar --}}
-    <aside id="adminSidebar"
-           class="fixed left-0 z-[999] w-72 bg-white border-r border-gray-100 shadow-2xl flex flex-col -translate-x-full transition-transform duration-300 ease-in-out"
-           style="top: var(--navbar-height, 64px); height: calc(100vh - var(--navbar-height, 64px));">
+    <aside id="adminSidebar" class="fixed left-0 z-[999] w-72 bg-white border-r border-gray-100 shadow-2xl flex flex-col -translate-x-full transition-transform duration-300 ease-in-out" style="top: var(--navbar-height, 64px); height: calc(100vh - var(--navbar-height, 64px));">
 
-        {{-- Sidebar Header --}}
         <div class="flex-shrink-0 px-5 py-4 border-b border-gray-100">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
@@ -77,7 +109,6 @@
             </div>
         </div>
 
-        {{-- User Profile Card --}}
         <div class="flex-shrink-0 mx-4 mt-4 p-3.5 bg-gradient-to-br from-indigo-50 to-purple-50/40 rounded-2xl border border-indigo-100/60">
             <div class="flex items-center space-x-3">
                 <div class="relative flex-shrink-0">
@@ -96,12 +127,10 @@
             </div>
         </div>
 
-        {{-- Nav label --}}
         <div class="px-5 pt-5 pb-1">
             <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Main Menu</span>
         </div>
 
-        {{-- Nav links --}}
         <nav class="flex-1 overflow-y-auto px-3 space-y-0.5 pb-2 custom-scrollbar">
             <a href="{{ route('admin.dashboard') }}"
                class="flex items-center px-3 py-2.5 rounded-xl transition-all duration-200 group
@@ -125,11 +154,6 @@
                     </svg>
                 </span>
                 <span class="text-sm font-semibold">Instructors</span>
-                @if($instructors->total() > 0)
-                    <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full {{ request()->routeIs('admin.instructors.*') ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-700' }}">
-                        {{ $instructors->total() }}
-                    </span>
-                @endif
             </a>
 
             <a href="{{ route('admin.members.index') }}"
@@ -192,7 +216,6 @@
             </a>
         </nav>
 
-        {{-- Footer Quick Actions --}}
         <div class="flex-shrink-0 p-4 border-t border-gray-100">
             <div class="grid grid-cols-2 gap-2 mb-3">
                 <a href="{{ route('admin.instructors.create') }}"
@@ -216,33 +239,76 @@
         </div>
     </aside>
 
-    {{-- Main Content with proper margin adjustment and background image --}}
+    {{-- Main Content --}}
     <div id="mainContent" class="transition-all duration-300 ease-in-out">
-        <main class="min-h-screen overflow-y-auto"
-              style="background-image: url('{{ asset('images/background2.jpg') }}');
-                     background-size: cover;
-                     background-position: center;
-                     background-attachment: fixed;">
+        <main class="min-h-screen" style="background-image: url('{{ asset('images/background2.jpg') }}'); background-size: cover; background-position: center; background-attachment: fixed;">
             <div class="p-4 md:p-6 lg:p-8">
                 <div class="max-w-6xl mx-auto">
 
-                    {{-- Header Section with Title and Actions --}}
+                    {{-- Flash Messages --}}
+                    @if(session('success'))
+                        <div class="toast-message mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 flex items-center justify-between shadow-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <span class="font-semibold">{{ session('success') }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-emerald-600 hover:text-emerald-800 text-xl font-bold">&times;</button>
+                        </div>
+                    @endif
+
+                    @if(session('error'))
+                        <div class="toast-message mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-800 flex items-center justify-between shadow-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                </div>
+                                <span class="font-semibold">{{ session('error') }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800 text-xl font-bold">&times;</button>
+                        </div>
+                    @endif
+
+                    @if($errors->any())
+                        <div class="toast-message mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-800 shadow-lg">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                </div>
+                                <span class="font-semibold">Please fix the following errors:</span>
+                            </div>
+                            <ul class="list-disc list-inside text-sm">
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    {{-- Header Section --}}
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden p-4">
                             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Instructors</h1>
                             <p class="text-sm text-gray-500 mt-1">Manage your fitness instructors</p>
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                             <div class="relative">
                                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
                                 <input id="instructor-search" type="search"
                                        placeholder="Search instructors..."
-                                       class="pl-10 pr-4 py-2 bg-white/80 border border-gray-200 rounded-xl text-sm w-64 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all" />
+                                       class="pl-10 pr-4 py-2 bg-white/80 border border-gray-200 rounded-xl text-sm w-full sm:w-64 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all" />
                             </div>
                             <a href="{{ route('admin.instructors.create') }}"
-                               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+                               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                                 </svg>
@@ -253,91 +319,80 @@
 
                     {{-- Instructors Table --}}
                     <div class="bg-white/85 backdrop-blur-md border border-white/40 rounded-2xl shadow-lg overflow-hidden">
-                        {{-- Table Header --}}
                         <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                             <div>
-                                <h3 class="font-bold text-gray-900 text-sm">Recent Instructors</h3>
-                                <p class="text-xs text-gray-400 mt-0.5">Latest registered instructors</p>
+                                <h3 class="font-bold text-gray-900 text-sm">Instructors List</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">All registered fitness instructors</p>
                             </div>
                             <div class="text-sm bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">
                                 Total: <span class="font-bold">{{ $instructors->total() ?? 0 }}</span>
                             </div>
                         </div>
 
-                        {{-- Table --}}
                         <div class="overflow-x-auto">
                             <table class="min-w-full">
                                 <thead>
                                     <tr class="bg-gray-50/80 border-b border-gray-100">
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
-                                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-                                    </tr>
+                                        <th class="px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th class="hidden sm:table-cell px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
+                                        <th class="px-3 py-3 sm:px-6 sm:py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-50">
                                     @forelse($instructors as $ins)
                                         <tr class="hover:bg-indigo-50/30 transition-colors duration-150">
-                                            <td class="px-6 py-4">
-                                                <div class="flex items-center gap-3">
-                                                    <img src="{{ $ins->photo_url ?? 'https://ui-avatars.com/api/?name='.urlencode($ins->name).'&background=4F46E5&color=fff&bold=true' }}"
-                                                         alt="" class="w-8 h-8 rounded-lg ring-2 ring-indigo-200">
-                                                    <div>
-                                                        <div class="text-sm font-semibold text-gray-800">{{ $ins->name }}</div>
-                                                        @if($ins->specialty)
-                                                            <span class="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{{ $ins->specialty }}</span>
-                                                        @endif
+                                            <td class="px-3 py-3 sm:px-6 sm:py-4">
+                                                <div class="flex items-center gap-2 sm:gap-3">
+                                                    <img src="https://ui-avatars.com/api/?name={{ urlencode($ins->name) }}&background=4F46E5&color=fff&bold=true&size=128"
+                                                         alt="" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg ring-2 ring-indigo-200 flex-shrink-0">
+                                                    <div class="min-w-0">
+                                                        <div class="text-sm font-semibold text-gray-800 truncate">{{ $ins->name }}</div>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">{{ $ins->email }}</td>
-                                            <td class="px-6 py-4">
+                                             </div>
+                                            <td class="hidden sm:table-cell px-3 py-3 sm:px-6 sm:py-4 text-sm text-gray-600">{{ $ins->email }}</td>
+                                            <td class="hidden md:table-cell px-3 py-3 sm:px-6 sm:py-4">
                                                 <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
                                                     {{ $ins->created_at->format('M d, Y') }}
                                                 </span>
-                                            </td>
-                                            <td class="px-6 py-4">
-                                                <div class="flex items-center gap-2">
+                                             </div>
+                                            <td class="px-3 py-3 sm:px-6 sm:py-4">
+                                                <div class="flex items-center gap-1 sm:gap-2">
                                                     <a href="{{ route('admin.instructors.edit', $ins->id) }}"
-                                                       class="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                       class="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 sm:px-3 py-1.5 rounded-lg transition-colors">
                                                         Edit
                                                     </a>
-                                                    <form action="{{ route('admin.instructors.destroy', $ins->id) }}"
-                                                          method="POST"
-                                                          onsubmit="return confirm('Are you sure you want to delete this instructor?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit"
-                                                                class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">
-                                                            Delete
-                                                        </button>
-                                                    </form>
+                                                    <button type="button"
+                                                            onclick="confirmDelete({{ $ins->id }})"
+                                                            class="inline-flex items-center text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 sm:px-3 py-1.5 rounded-lg transition-colors">
+                                                        Delete
+                                                    </button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                             </div>
+                                         </tr>
                                     @empty
-                                        <tr>
+                                         <tr>
                                             <td colspan="4" class="px-6 py-12 text-center">
-                                                <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                                                <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                                                     <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                                                     </svg>
                                                 </div>
-                                                <p class="text-sm text-gray-400 font-medium">No instructors found.</p>
+                                                <p class="text-sm text-gray-500 font-medium">No instructors found.</p>
                                                 <a href="{{ route('admin.instructors.create') }}" class="inline-flex items-center gap-2 mt-3 text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                                     </svg>
                                                     Register your first instructor
                                                 </a>
-                                            </td>
-                                        </tr>
+                                             </div>
+                                         </tr>
                                     @endforelse
                                 </tbody>
                             </table>
                         </div>
 
-                        {{-- Pagination --}}
                         @if($instructors->hasPages())
                             <div class="px-6 py-4 border-t border-gray-100">
                                 {{ $instructors->links() }}
@@ -350,9 +405,95 @@
         </main>
     </div>
 
+    {{-- Footer --}}
+    <footer class="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-purple-500/30">
+        <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
+                <div class="col-span-2 md:col-span-1 lg:col-span-2">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="flex items-center">
+                            <img src="{{ asset('images/Project_Logo.png') }}" alt="Gym Logo" class="h-7 w-auto object-contain">
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        Train smart, stay consistent, and celebrate your growth. We're a community rooted in African strength and unity.
+                    </p>
+                    <div class="flex space-x-4 mt-4">
+                        <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.77l-.44 2.89h-2.33v6.987A10 10 0 0022 12z" clip-rule="evenodd" /></svg>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12.315 2c2.43 0 2.715.01 3.67.058 1.036.05 1.745.21 2.37.456.684.276 1.258.74 1.717 1.259.46.52.825 1.094 1.102 1.717.246.625.407 1.334.456 2.37.048.955.058 1.23.058 3.67s-.01 2.715-.058 3.67c-.05.97-.21 1.745-.456 2.37-.276.684-.74 1.258-1.259 1.717-.52.46-1.094.825-1.717 1.102-.625.246-1.334.407-2.37.456-.955.048-1.23.058-3.67.058s-2.715-.01-3.67-.058c-.97-.05-1.745-.21-2.37-.456-.684-.276-1.258-.74-1.717-1.259-.46-.52-.825-1.094-1.102-1.717-.246-.625-.407-1.334-.456-2.37-.048-.955-.058-1.23-.058-3.67s.01-2.715.058-3.67c.05-.97.21-1.745.456-2.37.276-.684.74-1.258 1.259-1.717.46-.52 1.094-.825 1.717-1.102.625-.246 1.334-.407 2.37-.456C9.59 2.01 9.875 2 12.315 2zm0 1.637c-2.35 0-2.6.01-3.535.056-.983.05-1.503.21-1.85.347-.417.164-.78.384-1.095.698-.315.315-.534.678-.698 1.095-.137.347-.297.867-.347 1.85-.046.935-.056 1.185-.056 3.535s.01 2.6.056 3.535c.05.983.21 1.503.347 1.85.164.417.384.78.698 1.095.315.315.678.534 1.095.698.347.137.867.297 1.85.347.935.046 1.185.056 3.535.056s2.6-.01 3.535-.056c.983-.05 1.503-.21 1.85-.347.417-.164.78-.384 1.095-.698.315-.315.534-.678.698-1.095.137-.347.297-.867.347-1.85.046-.935.056-1.185.056-3.535s-.01-2.6-.056-3.535c-.05-.983-.21-1.503-.347-1.85-.164-.417-.384-.78-.698-1.095-.315-.315-.678-.534-1.095-.698-.347-.137-.867-.297-1.85-.347-.935-.046-1.185-.056-3.535-.056zM12.315 5.564c-3.714 0-6.75 3.036-6.75 6.75s3.036 6.75 6.75 6.75 6.75-3.036 6.75-6.75-3.036-6.75-6.75-6.75zm0 11.235c-2.476 0-4.485-2.009-4.485-4.485S9.839 7.828 12.315 7.828s4.485 2.009 4.485 4.485-2.009 4.485-4.485 4.485zm4.991-9.982c-.52 0-.942-.423-.942-.942s.422-.942.942-.942.942.423.942.942-.422.942-.942.942z" clip-rule="evenodd" /></svg>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-purple-400 transition duration-300">
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h5 class="text-lg font-semibold text-white mb-4">Admin Panel</h5>
+                    <ul class="space-y-3">
+                        <li><a href="{{ route('admin.dashboard') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📊 Dashboard</a></li>
+                        <li><a href="{{ route('admin.members.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">👥 Manage Members</a></li>
+                        <li><a href="{{ route('admin.instructors.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">👨‍🏫 Manage Instructors</a></li>
+                        <li><a href="{{ route('admin.earnings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💰 Earnings Overview</a></li>
+                        <li><a href="{{ route('admin.reports.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📈 Reports</a></li>
+                        <li><a href="{{ route('admin.settings.index') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">⚙️ Settings</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h5 class="text-lg font-semibold text-white mb-4">System</h5>
+                    <ul class="space-y-3">
+                        <li><a href="{{ route('admin.system.health') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🩺 System Health</a></li>
+                        <li><a href="{{ route('admin.system.logs') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">📋 System Logs</a></li>
+                        <li><a href="{{ route('admin.database.backup') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">💾 Database Backup</a></li>
+                        <li>
+                            <form method="POST" action="{{ route('admin.system.clear-cache') }}" class="inline" onsubmit="return confirm('Are you sure you want to clear the system cache?');">
+                                @csrf
+                                <button type="submit" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">🗑️ Clear Cache</button>
+                            </form>
+                        </li>
+                        <li><a href="{{ route('admin.system.queue-status') }}" class="text-sm text-gray-400 hover:text-purple-400 transition duration-300">⏳ Queue Status</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-span-2 md:col-span-1">
+                    <h5 class="text-lg font-semibold text-white mb-4">Get In Touch</h5>
+                    <ul class="space-y-3 text-sm text-gray-400">
+                        <li class="flex items-start"><span class="mr-2 text-purple-400">📍</span><span>Ggaba Road, Kampala, UGANDA</span></li>
+                        <li class="flex items-start"><span class="mr-2 text-purple-400">📞</span><span>+256 700 123 456</span></li>
+                        <li class="flex items-start"><span class="mr-2 text-purple-400">📧</span><span><a href="mailto:admin@mygym.com" class="hover:text-purple-400">admin@mygym.com</a></span></li>
+                    </ul>
+                    <div class="mt-6">
+                        <h5 class="text-sm font-semibold text-white mb-2">Support Hours</h5>
+                        <p class="text-xs text-gray-400">Monday - Friday: 9AM - 6PM</p>
+                        <p class="text-xs text-gray-400">Saturday: 10AM - 4PM</p>
+                        <p class="text-xs text-gray-400">Sunday: Closed</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-12 pt-8 border-t border-purple-500/30">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex gap-6">
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">About Us</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Terms of Service</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Privacy Policy</a>
+                        <a href="#" class="text-xs text-gray-500 hover:text-purple-400 transition-colors">Cookie Policy</a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p class="text-sm text-gray-500">&copy; {{ date('Y') }} MyGym. All rights reserved. Powered by Passion.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
     <script>
+        // Sidebar functionality
         document.addEventListener('DOMContentLoaded', function() {
-            // ==================== SIDEBAR FUNCTIONALITY ====================
             const navbar = document.querySelector('nav') || document.querySelector('header');
             if (navbar) {
                 const h = navbar.offsetHeight;
@@ -383,18 +524,12 @@
                 mainContent.style.marginLeft = '0';
             }
 
-            function toggleSidebar() {
-                sidebarOpen ? closeSidebar() : openSidebar();
-            }
-
-            toggleBtn?.addEventListener('click', toggleSidebar);
+            toggleBtn?.addEventListener('click', function() { sidebarOpen ? closeSidebar() : openSidebar(); });
             closeBtn?.addEventListener('click', closeSidebar);
             overlay?.addEventListener('click', closeSidebar);
 
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    if (sidebarOpen) closeSidebar();
-                }
+                if (e.key === 'Escape' && sidebarOpen) closeSidebar();
             });
 
             window.addEventListener('resize', function() {
@@ -405,27 +540,76 @@
                 }
             });
 
-            // ==================== SEARCH FUNCTIONALITY ====================
-            document.getElementById('instructor-search')?.addEventListener('input', function(){
+            // Search functionality
+            document.getElementById('instructor-search')?.addEventListener('input', function() {
                 const q = this.value.toLowerCase();
                 document.querySelectorAll('tbody tr').forEach(row => {
                     const txt = row.innerText.toLowerCase();
                     row.style.display = txt.includes(q) ? '' : 'none';
                 });
             });
+
+            // Auto-dismiss toast messages
+            setTimeout(function() {
+                document.querySelectorAll('.toast-message').forEach(function(message) {
+                    setTimeout(function() {
+                        message.style.opacity = '0';
+                        message.style.transform = 'translateY(-10px)';
+                        message.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                        setTimeout(function() {
+                            if (message.parentNode) message.remove();
+                        }, 500);
+                    }, 4500);
+                });
+            }, 1000);
+        });
+
+        // Delete confirmation with modal
+        let deleteId = null;
+
+        function confirmDelete(id) {
+            deleteId = id;
+            const modal = document.getElementById('deleteModal');
+            const content = document.getElementById('deleteModalContent');
+            const form = document.getElementById('deleteForm');
+            form.action = `/admin/instructors/${id}`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            const content = document.getElementById('deleteModalContent');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.style.overflow = '';
+                deleteId = null;
+            }, 200);
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeDeleteModal();
         });
     </script>
 
     <style>
-        /* Custom scrollbar for sidebar */
         .custom-scrollbar::-webkit-scrollbar { width: 3px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(79,70,229,0.2); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(79,70,229,0.45); }
 
-        /* Sidebar transitions */
         #adminSidebar { will-change: transform; }
         #sidebarOverlay { transition: opacity 0.3s ease; }
         #mainContent { transition: margin-left 0.3s cubic-bezier(0.4,0,0.2,1); }
+        .toast-message { transition: opacity 0.5s ease, transform 0.5s ease; }
     </style>
 </x-app-layout>

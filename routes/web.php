@@ -12,8 +12,10 @@ use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MemberDashboardController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controllers\AIChatController;
 use App\Http\Controllers\ChatSessionController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PlanController;
+use App\Http\Controllers\InstructorDashboardController;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +69,17 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |----------------------------------------------------------------------
+    | Plans & Subscriptions
+    |----------------------------------------------------------------------
+    */
+    Route::prefix('plans')->name('plans.')->group(function () {
+        Route::get('/', [PlanController::class, 'index'])->name('index');
+        Route::post('/{plan}/subscribe', [PlanController::class, 'subscribe'])->name('subscribe');
+        Route::post('/cancel', [PlanController::class, 'cancelSubscription'])->name('cancel');
+    });
+
+    /*
+    |----------------------------------------------------------------------
     | User Settings
     |----------------------------------------------------------------------
     */
@@ -92,31 +105,56 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |======================================================================
+    | NOTIFICATIONS SYSTEM (For all authenticated users)
+    |======================================================================
+    */
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+        Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear-all');
+    });
+
+    /*
+    |======================================================================
     | AI CHAT SYSTEM - FULLY FUNCTIONAL (Available for ALL authenticated users)
     |======================================================================
     */
     Route::prefix('chat')->name('chat.')->group(function () {
-        // Main chat endpoints
-        Route::post('/send', [AIChatController::class, 'sendMessage'])->name('send');
-        Route::get('/suggestions', [AIChatController::class, 'getSuggestions'])->name('suggestions');
+        // Main chat endpoint
+        Route::post('/send', [ChatSessionController::class, 'sendMessage'])->name('send');
+
+        // Suggestions endpoint
+        Route::get('/suggestions', [ChatSessionController::class, 'getSuggestions'])->name('suggestions');
 
         // Session management
-        Route::get('/sessions', [AIChatController::class, 'getSessions'])->name('sessions');
-        Route::get('/sessions/current', [AIChatController::class, 'getCurrentSession'])->name('sessions.current');
-        Route::post('/sessions', [AIChatController::class, 'createSession'])->name('sessions.create');
-        Route::get('/sessions/{id}', [AIChatController::class, 'getSession'])->name('sessions.show');
-        Route::delete('/sessions/{id}', [AIChatController::class, 'deleteSession'])->name('sessions.delete');
-        Route::put('/sessions/{id}', [ChatSessionController::class, 'update'])->name('chat.session.update');
-        Route::get('/share/{id}', [ChatSessionController::class, 'share'])->name('chat.session.share');
+        Route::get('/sessions', [ChatSessionController::class, 'index'])->name('sessions.index');
+        Route::get('/sessions/current', [ChatSessionController::class, 'getCurrentSession'])->name('sessions.current');
+        Route::post('/sessions', [ChatSessionController::class, 'store'])->name('sessions.store');
+        Route::get('/sessions/{id}', [ChatSessionController::class, 'show'])->name('sessions.show');
+        Route::put('/sessions/{id}', [ChatSessionController::class, 'update'])->name('sessions.update');
+        Route::delete('/sessions/{id}', [ChatSessionController::class, 'destroy'])->name('sessions.destroy');
+
+        // Share chat
+        Route::get('/sessions/{id}/share', [ChatSessionController::class, 'shareSession'])->name('sessions.share');
+        Route::get('/share/{token}', [ChatSessionController::class, 'getSharedSession'])->name('share');
+
+        // Regenerate message
+        Route::post('/message/{messageId}/regenerate', [ChatSessionController::class, 'regenerateMessage'])->name('message.regenerate');
 
         // History management
-        Route::delete('/clear-all', [AIChatController::class, 'clearAllHistory'])->name('clear-all');
-        Route::get('/export', [AIChatController::class, 'exportHistory'])->name('export');
+        Route::delete('/clear-all', [ChatSessionController::class, 'clearAllHistory'])->name('clear-all');
+        Route::get('/export', [ChatSessionController::class, 'exportHistory'])->name('export');
+        Route::get('/statistics', [ChatSessionController::class, 'getStatistics'])->name('statistics');
 
         // Legacy routes for backward compatibility (will be deprecated)
-        Route::get('/history-list', [AIChatController::class, 'getSessions'])->name('history-list');
-        Route::get('/history', [AIChatController::class, 'getCurrentSession'])->name('history');
-        Route::delete('/clear', [AIChatController::class, 'clearAllHistory'])->name('clear');
+        Route::get('/history-list', [ChatSessionController::class, 'index'])->name('history-list');
+        Route::get('/history', [ChatSessionController::class, 'getCurrentSession'])->name('history');
+        Route::delete('/clear', [ChatSessionController::class, 'clearHistory'])->name('clear');
+        Route::delete('/message/{messageId}', [ChatSessionController::class, 'deleteMessage'])->name('message.delete');
+        Route::get('/message/{messageId}', [ChatSessionController::class, 'getMessage'])->name('message.show');
+        Route::post('/feedback', [ChatSessionController::class, 'submitFeedback'])->name('feedback');
     });
 
     /*
@@ -150,6 +188,19 @@ Route::middleware(['auth'])->group(function () {
         // Workout exercises
         Route::post('/workout-exercises/{workoutExercise}/complete', [MemberDashboardController::class, 'completeExercise'])->name('workout-exercises.complete');
 
+        // Trainer selection
+        Route::post('/select-trainer', [MemberDashboardController::class, 'selectTrainer'])->name('select-trainer');
+        Route::get('/chat-messages/{trainerId}', [MemberDashboardController::class, 'getChatMessages'])->name('chat.messages');
+
+        // ==================== MESSAGE ROUTES ====================
+        Route::prefix('messages')->name('messages.')->group(function () {
+            Route::post('/send', [MemberDashboardController::class, 'sendMessage'])->name('send');
+            Route::get('/{userId}', [MemberDashboardController::class, 'getMessages'])->name('get');
+            Route::delete('/{message}', [MemberDashboardController::class, 'deleteMessage'])->name('delete');
+            Route::put('/{message}', [MemberDashboardController::class, 'updateMessage'])->name('update');
+            Route::post('/{message}/pin', [MemberDashboardController::class, 'pinMessage'])->name('pin');
+        });
+
         // Attendance routes
         Route::prefix('attendance')->name('attendance.')->group(function () {
             Route::post('/check-in', [MemberDashboardController::class, 'checkIn'])->name('check-in');
@@ -171,18 +222,6 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('goals')->name('goals.')->group(function () {
             Route::post('/store', [MemberDashboardController::class, 'createGoal'])->name('store');
             Route::get('/', [MemberDashboardController::class, 'getGoals'])->name('index');
-        });
-
-        // Notification routes
-        Route::prefix('notifications')->name('notifications.')->group(function () {
-            Route::post('/{notification}/read', [MemberDashboardController::class, 'markNotificationRead'])->name('read');
-            Route::post('/mark-all-read', [MemberDashboardController::class, 'markAllNotificationsRead'])->name('mark-all-read');
-        });
-
-        // Message routes (for instructor communication)
-        Route::prefix('messages')->name('messages.')->group(function () {
-            Route::post('/send', [MemberDashboardController::class, 'sendMessage'])->name('send');
-            Route::get('/{userId}', [MemberDashboardController::class, 'getMessages'])->name('get');
         });
 
         // Class booking routes
@@ -217,71 +256,19 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware(['role:instructor'])->prefix('instructor')->name('instructor.')->group(function () {
 
-        // Dashboard
-        Route::get('/dashboard', function () {
-            /** @var \App\Models\User $user */
-            $user = Auth::user();
+        // ==================== INSTRUCTOR DASHBOARD ====================
+        Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
 
-            $totalUniqueClients = ScheduledClass::where('instructor_id', $user->id)
-                ->with('members')
-                ->get()
-                ->pluck('members')
-                ->flatten()
-                ->unique('id')
-                ->count();
-
-            $totalBookings = ScheduledClass::where('instructor_id', $user->id)
-                ->withCount('members')
-                ->get()
-                ->sum('members_count');
-
-            $totalClasses = ScheduledClass::where('instructor_id', $user->id)->count();
-
-            $upcomingClasses = ScheduledClass::where('instructor_id', $user->id)
-                ->where('date_time', '>', Carbon::now())
-                ->count();
-
-            $pastClasses = ScheduledClass::where('instructor_id', $user->id)
-                ->where('date_time', '<', Carbon::now())
-                ->count();
-
-            $totalStudents = ScheduledClass::where('instructor_id', $user->id)
-                ->withCount('members')
-                ->get()
-                ->sum('members_count');
-
-            $totalEarnings = Receipt::whereHas('scheduledClass', fn($q) =>
-                $q->where('instructor_id', $user->id)
-            )->sum('amount');
-
-            $recentClasses = ScheduledClass::where('instructor_id', $user->id)
-                ->with(['classType', 'instructor'])
-                ->withCount('members')
-                ->latest()
-                ->take(5)
-                ->get();
-
-            $topClasses = ScheduledClass::where('instructor_id', $user->id)
-                ->with('classType')
-                ->withCount('members')
-                ->orderByDesc('members_count')
-                ->take(5)
-                ->get();
-
-            return view('instructor.dashboard', compact(
-                'totalUniqueClients', 'totalBookings', 'totalClasses',
-                'upcomingClasses', 'pastClasses', 'totalStudents',
-                'totalEarnings', 'recentClasses', 'topClasses'
-            ));
-        })->name('dashboard');
-
-        // Instructor messaging routes
+        // ==================== INSTRUCTOR MESSAGE ROUTES ====================
         Route::prefix('messages')->name('messages.')->group(function () {
-            Route::get('/conversations', [MessageController::class, 'instructorConversations'])->name('conversations');
-            Route::get('/conversation/{userId}', [MessageController::class, 'getConversation'])->name('conversation');
-            Route::post('/send', [MessageController::class, 'sendMessage'])->name('send');
-            Route::post('/{message}/read', [MessageController::class, 'markAsRead'])->name('read');
-            Route::delete('/conversation/{userId}', [MessageController::class, 'deleteConversation'])->name('delete');
+            Route::get('/conversation/{userId}', [InstructorDashboardController::class, 'getConversation'])->name('conversation');
+            Route::post('/send', [InstructorDashboardController::class, 'sendMessage'])->name('send');
+            Route::delete('/{message}', [InstructorDashboardController::class, 'deleteMessage'])->name('delete');
+            Route::put('/{message}', [InstructorDashboardController::class, 'updateMessage'])->name('update');
+            Route::post('/{message}/pin', [InstructorDashboardController::class, 'pinMessage'])->name('pin');
+            Route::get('/members', [InstructorDashboardController::class, 'getMembers'])->name('members');
+            Route::get('/unread-count', [InstructorDashboardController::class, 'getUnreadCount'])->name('unread-count');
+            Route::post('/mark-read/{memberId}', [InstructorDashboardController::class, 'markConversationAsRead'])->name('mark-read');
         });
 
         // Upcoming classes
@@ -415,6 +402,17 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('system')->name('system.')->group(function () {
             Route::get('/health', [AdminController::class, 'systemHealth'])->name('health');
             Route::get('/logs', [AdminController::class, 'systemLogs'])->name('logs');
+            Route::post('/cache/clear', [AdminController::class, 'clearSystemCache'])->name('clear-cache');
+            Route::get('/phpinfo', [AdminController::class, 'phpInfo'])->name('phpinfo');
+            Route::get('/queue-status', [AdminController::class, 'queueStatus'])->name('queue-status');
+            Route::post('/queue-restart', [AdminController::class, 'restartQueue'])->name('queue-restart');
+        });
+
+        // System health
+        Route::prefix('system')->name('system.')->group(function () {
+            Route::get('/health', [AdminController::class, 'systemHealth'])->name('health');
+            Route::get('/logs', [AdminController::class, 'systemLogs'])->name('logs');
+            Route::post('/clear-logs', [AdminController::class, 'clearLogs'])->name('clear-logs');
             Route::post('/cache/clear', [AdminController::class, 'clearSystemCache'])->name('clear-cache');
             Route::get('/phpinfo', [AdminController::class, 'phpInfo'])->name('phpinfo');
             Route::get('/queue-status', [AdminController::class, 'queueStatus'])->name('queue-status');

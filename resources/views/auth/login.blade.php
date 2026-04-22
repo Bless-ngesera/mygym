@@ -29,27 +29,17 @@
             .input-field::placeholder { color: #a0aec0; }
 
             .login-btn {
-                /* Direction (to bottom right), Start Color, End Color */
                 background: linear-gradient(135deg, #7e22ce 0%, #1e293b 100%);
-
-                /* Keep your existing styles */
                 transition: all 0.2s ease;
                 box-shadow: 0 10px 15px -3px rgba(126, 34, 206, 0.3);
-
-                /* Important: Ensure text is readable */
                 color: white;
                 border: none;
                 cursor: pointer;
             }
             .login-btn:hover {
-                 /* Direction (to bottom right), Start Color, End Color */
                 background: linear-gradient(135deg, #1e293b 0%, #7e22ce 100%);
-
-                /* Keep your existing styles */
                 transition: all 0.2s ease;
                 box-shadow: 0 20px 25px -5px rgba(126, 34, 206, 0.4);
-
-                /* Important: Ensure text is readable */
                 color: white;
                 border: none;
                 cursor: pointer;
@@ -115,12 +105,14 @@
 
             <div class="card-glass card-wrap rounded-2xl p-8 w-full max-w-md">
 
-                {{-- Brand - Clean like welcome page --}}
+                {{-- Brand - Logo instead of text --}}
                 <div class="text-center mb-8">
-                    <h1 class="text-5xl font-extrabold tracking-tight">
-                        <span class="text-purple-700">My</span><span class="text-gray-900">Gym</span>
-                    </h1>
-                    <p class="mt-2 text-sm text-gray-600">
+                    <div class="flex justify-center mb-3">
+                        <img src="{{ asset('images/Project_Logo.png') }}"
+                             alt="MyGym Logo"
+                             class="h-16 w-auto object-contain">
+                    </div>
+                    <p class="text-sm text-gray-600">
                         Sign in to your fitness dashboard
                     </p>
                 </div>
@@ -202,6 +194,12 @@
 
                 {{-- Simple Footer --}}
                 <div class="mt-7 pt-5 border-t divider-line text-center">
+                    <div class="flex justify-center gap-6 mb-3">
+                        <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">About</a>
+                        <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Terms</a>
+                        <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Privacy</a>
+                        <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Contact</a>
+                    </div>
                     <p class="text-xs text-gray-400">
                         &copy; {{ date('Y') }} MyGym. All rights reserved.
                     </p>

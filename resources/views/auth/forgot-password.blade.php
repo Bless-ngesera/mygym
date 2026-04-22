@@ -78,6 +78,14 @@
             align-items: center;
             pointer-events: none;
         }
+
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+        .fade-out {
+            animation: fadeOut 0.5s ease-out forwards;
+        }
     </style>
 
     <!-- Background Image -->
@@ -87,21 +95,23 @@
     <!-- Simple dark overlay -->
     <div class="fixed inset-0 bg-black/30"></div>
 
-    <!-- Centered Content -->
+    <!-- Centered Content - EXACT SAME WIDTH AND POSITIONING AS LOGIN PAGE -->
     <div class="relative flex items-center justify-center min-h-screen px-4">
         <div class="card-glass card-wrap rounded-2xl p-8 w-full max-w-md">
 
-            {{-- Brand --}}
-            <div class="text-center mb-6">
-                <h1 class="text-5xl font-extrabold tracking-tight">
-                    <span class="text-purple-700">My</span><span class="text-gray-900">Gym</span>
-                </h1>
-                <p class="mt-2 text-sm text-gray-600">
+            {{-- Brand - Logo instead of text (EXACT SAME AS LOGIN PAGE) --}}
+            <div class="text-center mb-8">
+                <div class="flex justify-center mb-3">
+                    <img src="{{ asset('images/Project_Logo.png') }}"
+                         alt="MyGym Logo"
+                         class="h-16 w-auto object-contain">
+                </div>
+                <p class="text-sm text-gray-600">
                     Reset your password
                 </p>
             </div>
 
-            <!-- Description -->
+            <!-- Description - SAME SPACING AS LOGIN PAGE -->
             <div class="mb-6 p-4 bg-purple-50/50 border border-purple-100 rounded-xl text-sm text-gray-600 leading-relaxed">
                 <div class="flex gap-3">
                     <svg class="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,13 +124,17 @@
                 </div>
             </div>
 
-            <!-- Session Status -->
-            <x-auth-session-status class="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl" :status="session('status')" />
+            <!-- Session Status with Auto-Dismiss -->
+            @if(session('status'))
+                <div id="successMessage" class="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                    {{ session('status') }}
+                </div>
+            @endif
 
             <form method="POST" action="{{ route('password.email') }}">
                 @csrf
 
-                <!-- Email Address -->
+                <!-- Email Address - SAME SPACING AS LOGIN PAGE -->
                 <div class="mb-6">
                     <label for="email" class="block label-text mb-1.5">Email Address</label>
                     <div class="relative">
@@ -142,13 +156,13 @@
                     <x-input-error :messages="$errors->get('email')" class="mt-2 text-xs text-red-500" />
                 </div>
 
-                <!-- Reset Button -->
+                <!-- Reset Button - SAME AS LOGIN BUTTON -->
                 <button type="submit"
                         class="reset-btn w-full py-2.5 text-white text-sm font-semibold rounded-xl tracking-wide uppercase">
                     Send Reset Link
                 </button>
 
-                <!-- Back to Login -->
+                <!-- Back to Login - SAME STYLING AS LOGIN PAGE -->
                 <p class="mt-5 text-center text-sm text-gray-600">
                     <a href="{{ route('login') }}" class="back-link font-semibold">
                         ← Back to login
@@ -156,12 +170,37 @@
                 </p>
             </form>
 
-            {{-- Simple Footer --}}
+            {{-- Footer - EXACT SAME AS LOGIN PAGE --}}
             <div class="mt-7 pt-5 border-t divider-line text-center">
+                <div class="flex justify-center gap-6 mb-3">
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">About</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Terms</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Privacy</a>
+                    <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">Contact</a>
+                </div>
                 <p class="text-xs text-gray-400">
                     &copy; {{ date('Y') }} MyGym. All rights reserved.
                 </p>
             </div>
         </div>
     </div>
+
+    <script>
+        // Auto-dismiss success message after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const successMessage = document.getElementById('successMessage');
+            if (successMessage) {
+                setTimeout(function() {
+                    successMessage.style.opacity = '0';
+                    successMessage.style.transform = 'translateY(-10px)';
+                    successMessage.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    setTimeout(function() {
+                        if (successMessage.parentNode) {
+                            successMessage.remove();
+                        }
+                    }, 500);
+                }, 5000);
+            }
+        });
+    </script>
 </x-guest-layout>

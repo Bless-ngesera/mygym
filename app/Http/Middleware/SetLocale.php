@@ -13,17 +13,10 @@ use Symfony\Component\HttpFoundation\Response;
 class SetLocale
 {
     /**
-     * Supported locales
+     * Supported locales - Now only English is supported
      */
     protected $supportedLocales = [
         'en' => 'English',
-        'es' => 'Español',
-        'fr' => 'Français',
-        'de' => 'Deutsch',
-        'it' => 'Italiano',
-        'pt' => 'Português',
-        'sw' => 'Kiswahili',
-        'ar' => 'العربية',
     ];
 
     /**
@@ -46,9 +39,10 @@ class SetLocale
     public function handle(Request $request, Closure $next)
     {
         try {
-            $locale = $this->getLocaleFromRequest($request);
+            // Force English locale only
+            $locale = 'en';
 
-            // Set the application locale
+            // Set the application locale to English
             App::setLocale($locale);
 
             // Store locale in session for persistence
@@ -57,12 +51,12 @@ class SetLocale
             // Also store in cookie for 1 year (365 days)
             Cookie::queue($this->cookieName, $locale, 60 * 24 * 365);
 
-            // Set locale for Carbon dates
+            // Set locale for Carbon dates to English
             if (class_exists('\Carbon\Carbon')) {
-                \Carbon\Carbon::setLocale($locale);
+                \Carbon\Carbon::setLocale('en');
             }
 
-            // Set locale for validation messages
+            // Set locale for validation messages to English
             if (function_exists('trans')) {
                 app('translator')->setLocale($locale);
             }
@@ -77,108 +71,39 @@ class SetLocale
     }
 
     /**
-     * Get locale from various sources in priority order
+     * Get locale from various sources in priority order - Now always returns 'en'
      *
      * @param  \Illuminate\Http\Request  $request
      * @return string
      */
     protected function getLocaleFromRequest(Request $request): string
     {
-        // Priority 1: Locale from request parameter (URL)
-        if ($request->has('locale')) {
-            $locale = $request->get('locale');
-            if ($this->isValidLocale($locale)) {
-                return $locale;
-            }
-        }
-
-        // Priority 2: Locale from session
-        if (Session::has('locale')) {
-            $locale = Session::get('locale');
-            if ($this->isValidLocale($locale)) {
-                return $locale;
-            }
-        }
-
-        // Priority 3: Locale from cookie
-        if ($request->hasCookie($this->cookieName)) {
-            $locale = $request->cookie($this->cookieName);
-            if ($this->isValidLocale($locale)) {
-                return $locale;
-            }
-        }
-
-        // Priority 4: Locale from authenticated user
-        if ($request->user() && $request->user()->language) {
-            $locale = $request->user()->language;
-            if ($this->isValidLocale($locale)) {
-                return $locale;
-            }
-        }
-
-        // Priority 5: Locale from browser Accept-Language header
-        $browserLocale = $this->getBrowserLocale($request);
-        if ($browserLocale && $this->isValidLocale($browserLocale)) {
-            return $browserLocale;
-        }
-
-        // Priority 6: Application default locale
-        return $this->defaultLocale;
+        // Force English only - ignore all other sources
+        return 'en';
     }
 
     /**
-     * Check if locale is supported
+     * Check if locale is supported - Only English is valid now
      *
      * @param  string  $locale
      * @return bool
      */
     protected function isValidLocale(?string $locale): bool
     {
-        if (!$locale) {
-            return false;
-        }
-
-        // Check exact match
-        if (array_key_exists($locale, $this->supportedLocales)) {
-            return true;
-        }
-
-        // Check for locale variants (e.g., en-US -> en)
-        $baseLocale = substr($locale, 0, 2);
-        if (array_key_exists($baseLocale, $this->supportedLocales)) {
-            return true;
-        }
-
-        return false;
+        // Only English is valid
+        return $locale === 'en';
     }
 
     /**
-     * Get locale from browser's Accept-Language header
+     * Get locale from browser's Accept-Language header - Ignored, always English
      *
      * @param  \Illuminate\Http\Request  $request
      * @return string|null
      */
     protected function getBrowserLocale(Request $request): ?string
     {
-        $acceptLanguage = $request->header('Accept-Language');
-
-        if (!$acceptLanguage) {
-            return null;
-        }
-
-        // Parse Accept-Language header
-        $locales = explode(',', $acceptLanguage);
-
-        foreach ($locales as $locale) {
-            // Extract language code (e.g., "en-US" -> "en")
-            $code = substr(trim($locale), 0, 2);
-
-            if ($this->isValidLocale($code)) {
-                return $code;
-            }
-        }
-
-        return null;
+        // Force English only
+        return 'en';
     }
 
     /**
@@ -198,11 +123,11 @@ class SetLocale
      */
     public static function getDefaultLocale(): string
     {
-        return (new static())->defaultLocale;
+        return 'en';
     }
 
     /**
-     * Switch locale for the user (helper method)
+     * Switch locale for the user - Now always English
      *
      * @param  string  $locale
      * @param  \Illuminate\Http\Request|null  $request
@@ -210,24 +135,7 @@ class SetLocale
      */
     public static function switchLocale(string $locale, ?Request $request = null): bool
     {
-        $middleware = new static();
-
-        if (!$middleware->isValidLocale($locale)) {
-            return false;
-        }
-
-        Session::put('locale', $locale);
-        Cookie::queue($middleware->cookieName, $locale, 60 * 24 * 365);
-
-        // If user is authenticated, update their preference
-        if ($request && $request->user()) {
-            try {
-                $request->user()->update(['language' => $locale]);
-            } catch (\Exception $e) {
-                Log::warning('Failed to update user language preference: ' . $e->getMessage());
-            }
-        }
-
-        return true;
+        // Force English only, ignore any switch attempts
+        return false;
     }
 }
