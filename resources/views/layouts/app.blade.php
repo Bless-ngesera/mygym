@@ -8,7 +8,6 @@
           openLocaleMenu: false
       }"
       x-init="() => {
-          // Initialize theme from localStorage or system preference
           const savedTheme = localStorage.getItem('theme') || 'system';
 
           if (savedTheme === 'system') {
@@ -20,7 +19,6 @@
               darkMode = savedTheme === 'dark';
           }
 
-          // Watch for system theme changes
           window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
               const currentTheme = localStorage.getItem('theme') || 'system';
               if (currentTheme === 'system') {
@@ -29,21 +27,16 @@
               }
           });
 
-          // Watch for darkMode changes
           $watch('darkMode', (value) => {
               const currentTheme = localStorage.getItem('theme') || 'system';
-              if (currentTheme === 'system') {
-                  return;
-              }
+              if (currentTheme === 'system') return;
               document.documentElement.classList.toggle('dark', value);
           });
 
-          // Watch for locale changes to update RTL
           $watch('isRTL', (value) => {
               document.documentElement.setAttribute('dir', value ? 'rtl' : 'ltr');
           });
 
-          // Close locale menu when clicking outside
           document.addEventListener('click', (e) => {
               if (!e.target.closest('.locale-menu-container')) {
                   openLocaleMenu = false;
@@ -72,7 +65,6 @@
         <style>
             [x-cloak] { display: none !important; }
 
-            /* Smooth theme transitions */
             * {
                 transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
             }
@@ -92,7 +84,7 @@
                 flex-direction: row-reverse;
             }
 
-            /* Custom scrollbar for chat */
+            /* Custom scrollbar */
             ::-webkit-scrollbar {
                 width: 8px;
                 height: 8px;
@@ -145,12 +137,21 @@
                 }
             }
 
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+            }
+
             .animate-fade-in {
                 animation: fadeIn 0.3s ease-out;
             }
 
             .animate-bounce {
                 animation: bounce 1.2s infinite;
+            }
+
+            .animate-pulse {
+                animation: pulse 2s infinite;
             }
 
             /* Typing indicator dots */
@@ -161,6 +162,14 @@
             .typing-dot:nth-child(1) { animation-delay: 0s; }
             .typing-dot:nth-child(2) { animation-delay: 0.2s; }
             .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+            /* Line clamp for notifications */
+            .line-clamp-2 {
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
         </style>
     </head>
 
@@ -206,12 +215,10 @@
                         overlay.classList.add('opacity-100');
                     }, 10);
 
-                    // Focus input after animation
                     setTimeout(() => {
                         const input = document.getElementById('chatInput');
                         if (input) {
                             input.focus();
-                            // Place cursor at end of any existing text
                             const length = input.value.length;
                             input.setSelectionRange(length, length);
                         }
@@ -247,7 +254,6 @@
                 const messagesContainer = document.getElementById('chatMessages');
                 if (!messagesContainer) return;
 
-                // Add user message to chat
                 const userMessageDiv = document.createElement('div');
                 userMessageDiv.className = 'flex justify-end animate-fade-in';
                 userMessageDiv.innerHTML = `
@@ -258,12 +264,10 @@
                 `;
                 messagesContainer.appendChild(userMessageDiv);
 
-                // Clear input
                 input.value = '';
                 input.style.height = 'auto';
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-                // Show typing indicator
                 const typingDiv = document.createElement('div');
                 typingDiv.id = 'typingIndicator';
                 typingDiv.className = 'flex justify-start animate-fade-in';
@@ -295,10 +299,8 @@
 
                     const data = await response.json();
 
-                    // Remove typing indicator
                     document.getElementById('typingIndicator')?.remove();
 
-                    // Add AI response
                     const aiMessageDiv = document.createElement('div');
                     aiMessageDiv.className = 'flex justify-start animate-fade-in';
                     aiMessageDiv.innerHTML = `
@@ -336,20 +338,17 @@
                 }
             };
 
-            // Use suggestion function
             window.useSuggestion = function(suggestion) {
                 const input = document.getElementById('chatInput');
                 if (input) {
                     input.value = suggestion;
                     input.focus();
-                    // Auto-resize textarea
                     input.style.height = 'auto';
                     input.style.height = Math.min(input.scrollHeight, 120) + 'px';
                     sendChatMessage();
                 }
             };
 
-            // Helper functions
             function escapeHtml(text) {
                 if (!text) return '';
                 const div = document.createElement('div');
@@ -360,18 +359,13 @@
             function formatMessage(message) {
                 if (!message) return '';
                 let formatted = message;
-                // Bold text with ** **
                 formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>');
-                // Italic text with * *
                 formatted = formatted.replace(/\*(.*?)\*/g, '<em class="text-gray-300">$1</em>');
-                // Line breaks
                 formatted = formatted.replace(/\n/g, '<br>');
-                // Bullet points
                 formatted = formatted.replace(/• (.*?)(<br>|$)/g, '<li class="ml-4 list-disc">$1</li>');
                 return formatted;
             }
 
-            // Auto-resize textarea
             function autoResizeTextarea() {
                 const textarea = document.getElementById('chatInput');
                 if (textarea) {
@@ -382,7 +376,6 @@
                 }
             }
 
-            // Enter key to send
             document.addEventListener('DOMContentLoaded', function() {
                 const chatInput = document.getElementById('chatInput');
                 if (chatInput) {
@@ -395,7 +388,6 @@
                     autoResizeTextarea();
                 }
 
-                // Close chat with Escape key
                 document.addEventListener('keydown', function(e) {
                     if (e.key === 'Escape') {
                         const sidebar = document.getElementById('aiChatSidebar');
@@ -405,14 +397,12 @@
                     }
                 });
 
-                // Close chat when clicking overlay
                 const overlay = document.getElementById('chatOverlay');
                 if (overlay) {
                     overlay.addEventListener('click', closeChat);
                 }
             });
 
-            // Prevent body scroll when chat is open
             function toggleBodyScroll(disable) {
                 if (disable) {
                     document.body.style.overflow = 'hidden';
@@ -421,7 +411,6 @@
                 }
             }
 
-            // Watch for chat open/close
             const observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.attributeName === 'class') {
@@ -434,12 +423,170 @@
                 });
             });
 
-            // Start observing when DOM is loaded
             document.addEventListener('DOMContentLoaded', function() {
                 const sidebar = document.getElementById('aiChatSidebar');
                 if (sidebar) {
                     observer.observe(sidebar, { attributes: true });
                 }
+            });
+
+            // ==================== NOTIFICATION BELL FUNCTIONS ====================
+
+            // Global notification functions
+            window.fetchNotifications = async function() {
+                try {
+                    const response = await fetch('/notifications/recent', {
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) throw new Error('Failed to fetch');
+
+                    const data = await response.json();
+                    if (data.success) {
+                        updateNotificationUI(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching notifications:', error);
+                }
+            };
+
+            window.markAsRead = async function(notificationId) {
+                try {
+                    const response = await fetch(`/notifications/${notificationId}/read`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        fetchNotifications();
+                    }
+                } catch (error) {
+                    console.error('Error marking as read:', error);
+                }
+            };
+
+            window.markAllAsRead = async function() {
+                try {
+                    const response = await fetch('/notifications/mark-all-read', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        fetchNotifications();
+                        const badge = document.getElementById('notification-badge');
+                        if (badge) badge.classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error marking all as read:', error);
+                }
+            };
+
+            window.handleNotificationClick = async function(notificationId, url) {
+                await markAsRead(notificationId);
+                if (url && url !== '#') {
+                    window.location.href = url;
+                }
+            };
+
+            function updateNotificationUI(data) {
+                const badge = document.getElementById('notification-badge');
+                const markAllBtn = document.getElementById('mark-all-read-btn');
+                const notificationsList = document.getElementById('notifications-list');
+
+                if (badge) {
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.classList.remove('hidden');
+                        badge.classList.add('animate-pulse');
+                        if (markAllBtn) markAllBtn.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                        badge.classList.remove('animate-pulse');
+                        if (markAllBtn) markAllBtn.classList.add('hidden');
+                    }
+                }
+
+                if (notificationsList && data.notifications) {
+                    if (data.notifications.length === 0) {
+                        notificationsList.innerHTML = `
+                            <div class="p-8 text-center">
+                                <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                                </svg>
+                                <p class="text-gray-500 text-sm">No new notifications</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    let html = '';
+                    for (const notification of data.notifications) {
+                        html += `
+                            <div class="p-4 hover:bg-purple-50/30 transition-colors cursor-pointer ${!notification.read ? 'bg-purple-50/50' : ''}"
+                                 onclick="handleNotificationClick(${notification.id}, '${notification.action_url || '#'}')">
+                                <div class="flex gap-3">
+                                    <div class="flex-shrink-0">
+                                        <span class="text-2xl">${notification.icon || '🔔'}</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <p class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(notification.title)}</p>
+                                            ${!notification.read ? `
+                                                <button onclick="event.stopPropagation(); markAsRead(${notification.id})"
+                                                        class="text-purple-500 hover:text-purple-700">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                        <p class="text-xs text-gray-600 mt-0.5 line-clamp-2">${escapeHtml(notification.message)}</p>
+                                        <p class="text-xs text-gray-400 mt-1">${notification.created_at || 'Just now'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    notificationsList.innerHTML = html;
+                }
+            }
+
+            // Initialize notification polling
+            let notificationInterval;
+
+            function startNotificationPolling() {
+                if (notificationInterval) clearInterval(notificationInterval);
+                fetchNotifications();
+                notificationInterval = setInterval(fetchNotifications, 30000);
+            }
+
+            function stopNotificationPolling() {
+                if (notificationInterval) {
+                    clearInterval(notificationInterval);
+                    notificationInterval = null;
+                }
+            }
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    stopNotificationPolling();
+                } else {
+                    startNotificationPolling();
+                }
+            });
+
+            document.addEventListener('DOMContentLoaded', function() {
+                startNotificationPolling();
             });
         </script>
     </body>

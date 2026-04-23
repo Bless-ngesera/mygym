@@ -40,7 +40,6 @@ Route::get('/lang/{locale}', function ($locale) {
         session()->put('locale', $locale);
         app()->setLocale($locale);
 
-        // Update user preference if logged in
         if (Auth::check()) {
             Auth::user()->update(['language' => $locale]);
         }
@@ -109,26 +108,38 @@ Route::middleware(['auth'])->group(function () {
     |======================================================================
     */
     Route::prefix('notifications')->name('notifications.')->group(function () {
+        // Main views
         Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/settings', [NotificationController::class, 'settings'])->name('settings');
+        Route::put('/settings', [NotificationController::class, 'updateSettings'])->name('update-settings');
+
+        // AJAX endpoints
+        Route::get('/recent', [NotificationController::class, 'recent'])->name('recent');
+        Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::get('/export', [NotificationController::class, 'export'])->name('export');
+
+        // Read operations
         Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::post('/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead'])->name('mark-multiple-read');
+
+        // Delete operations
         Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
         Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear-all');
+        Route::delete('/clear-read', [NotificationController::class, 'clearRead'])->name('clear-read');
+        Route::delete('/destroy-multiple', [NotificationController::class, 'destroyMultiple'])->name('destroy-multiple');
     });
 
     /*
     |======================================================================
-    | AI CHAT SYSTEM - FULLY FUNCTIONAL (Available for ALL authenticated users)
+    | AI CHAT SYSTEM (Available for ALL authenticated users)
     |======================================================================
     */
     Route::prefix('chat')->name('chat.')->group(function () {
-        // Main chat endpoint
         Route::post('/send', [ChatSessionController::class, 'sendMessage'])->name('send');
-
-        // Suggestions endpoint
         Route::get('/suggestions', [ChatSessionController::class, 'getSuggestions'])->name('suggestions');
 
-        // Session management
         Route::get('/sessions', [ChatSessionController::class, 'index'])->name('sessions.index');
         Route::get('/sessions/current', [ChatSessionController::class, 'getCurrentSession'])->name('sessions.current');
         Route::post('/sessions', [ChatSessionController::class, 'store'])->name('sessions.store');
@@ -136,19 +147,16 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/sessions/{id}', [ChatSessionController::class, 'update'])->name('sessions.update');
         Route::delete('/sessions/{id}', [ChatSessionController::class, 'destroy'])->name('sessions.destroy');
 
-        // Share chat
         Route::get('/sessions/{id}/share', [ChatSessionController::class, 'shareSession'])->name('sessions.share');
         Route::get('/share/{token}', [ChatSessionController::class, 'getSharedSession'])->name('share');
 
-        // Regenerate message
         Route::post('/message/{messageId}/regenerate', [ChatSessionController::class, 'regenerateMessage'])->name('message.regenerate');
 
-        // History management
         Route::delete('/clear-all', [ChatSessionController::class, 'clearAllHistory'])->name('clear-all');
         Route::get('/export', [ChatSessionController::class, 'exportHistory'])->name('export');
         Route::get('/statistics', [ChatSessionController::class, 'getStatistics'])->name('statistics');
 
-        // Legacy routes for backward compatibility (will be deprecated)
+        // Legacy routes
         Route::get('/history-list', [ChatSessionController::class, 'index'])->name('history-list');
         Route::get('/history', [ChatSessionController::class, 'getCurrentSession'])->name('history');
         Route::delete('/clear', [ChatSessionController::class, 'clearHistory'])->name('clear');
@@ -164,13 +172,13 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware(['role:member'])->prefix('member')->name('member.')->group(function () {
 
-        // ==================== MEMBER DASHBOARD ====================
+        // Dashboard
         Route::get('/dashboard', [MemberDashboardController::class, 'index'])->name('dashboard');
 
-        // AI Chat - Main endpoint (legacy, keep for compatibility)
+        // AI Chat
         Route::post('/ai-chat', [MemberDashboardController::class, 'aiChat'])->name('ai.chat');
 
-        // Workout Templates (for scheduling)
+        // Workout Templates
         Route::get('/workout-templates', [MemberDashboardController::class, 'getWorkoutTemplates'])->name('workout-templates');
 
         // Workout routes
@@ -192,7 +200,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/select-trainer', [MemberDashboardController::class, 'selectTrainer'])->name('select-trainer');
         Route::get('/chat-messages/{trainerId}', [MemberDashboardController::class, 'getChatMessages'])->name('chat.messages');
 
-        // ==================== MESSAGE ROUTES ====================
+        // Message routes
         Route::prefix('messages')->name('messages.')->group(function () {
             Route::post('/send', [MemberDashboardController::class, 'sendMessage'])->name('send');
             Route::get('/{userId}', [MemberDashboardController::class, 'getMessages'])->name('get');
@@ -213,7 +221,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/today', [MemberDashboardController::class, 'getTodayNutrition'])->name('today');
         });
 
-        // Progress routes (weight tracking)
+        // Progress routes
         Route::prefix('progress')->name('progress.')->group(function () {
             Route::post('/weight', [MemberDashboardController::class, 'addProgress'])->name('weight');
         });
@@ -239,9 +247,11 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/upcoming', [BookingController::class, 'upcoming'])->name('upcoming');
             Route::get('/past', [BookingController::class, 'past'])->name('past');
             Route::get('/{id}', [BookingController::class, 'show'])->name('show');
+            Route::post('/{scheduledClassId}/resend', [BookingController::class, 'resendConfirmation'])->name('resend');
+            Route::get('/statistics', [BookingController::class, 'statistics'])->name('statistics');
         });
 
-        // Receipts (member's own)
+        // Receipts
         Route::prefix('receipts')->name('receipts.')->group(function () {
             Route::get('/', [BookingController::class, 'receipts'])->name('index');
             Route::get('/{receiptId}', [BookingController::class, 'receipt'])->name('show');
@@ -256,10 +266,20 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware(['role:instructor'])->prefix('instructor')->name('instructor.')->group(function () {
 
-        // ==================== INSTRUCTOR DASHBOARD ====================
         Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
 
-        // ==================== INSTRUCTOR MESSAGE ROUTES ====================
+        // Notification routes for instructors
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+            Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+            Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear-all');
+            Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
+            Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        });
+
+        // Message routes
         Route::prefix('messages')->name('messages.')->group(function () {
             Route::get('/conversation/{userId}', [InstructorDashboardController::class, 'getConversation'])->name('conversation');
             Route::post('/send', [InstructorDashboardController::class, 'sendMessage'])->name('send');
@@ -281,7 +301,7 @@ Route::middleware(['auth'])->group(function () {
         // All instructor classes
         Route::get('/classes', [ScheduledClassController::class, 'instructorClasses'])->name('classes');
 
-        // Individual schedule management
+        // Schedule management
         Route::prefix('schedule')->name('schedule.')->group(function () {
             Route::get('/{scheduledClass}', [ScheduledClassController::class, 'show'])->name('show');
             Route::get('/{scheduledClass}/edit', [ScheduledClassController::class, 'edit'])->name('edit');
@@ -302,7 +322,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/calendar', [ScheduledClassController::class, 'calendar'])->name('calendar');
         Route::get('/statistics', [ScheduledClassController::class, 'statistics'])->name('statistics');
 
-        // Member management for instructors
+        // Member management
         Route::prefix('members')->name('members.')->group(function () {
             Route::get('/', [ScheduledClassController::class, 'members'])->name('index');
             Route::get('/{userId}/progress', [ScheduledClassController::class, 'memberProgress'])->name('progress');
@@ -316,7 +336,7 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |----------------------------------------------------------------------
-    | Schedule resource (instructor middleware applied on resource)
+    | Schedule resource
     |----------------------------------------------------------------------
     */
     Route::resource('schedule', ScheduledClassController::class)
@@ -332,6 +352,18 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/', [AdminController::class, 'dashboard'])->name('index');
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        // Notification routes for admins
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+            Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+            Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear-all');
+            Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
+            Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+            Route::get('/export', [NotificationController::class, 'export'])->name('export');
+        });
 
         // Members
         Route::prefix('members')->name('members.')->group(function () {
@@ -402,16 +434,6 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('system')->name('system.')->group(function () {
             Route::get('/health', [AdminController::class, 'systemHealth'])->name('health');
             Route::get('/logs', [AdminController::class, 'systemLogs'])->name('logs');
-            Route::post('/cache/clear', [AdminController::class, 'clearSystemCache'])->name('clear-cache');
-            Route::get('/phpinfo', [AdminController::class, 'phpInfo'])->name('phpinfo');
-            Route::get('/queue-status', [AdminController::class, 'queueStatus'])->name('queue-status');
-            Route::post('/queue-restart', [AdminController::class, 'restartQueue'])->name('queue-restart');
-        });
-
-        // System health
-        Route::prefix('system')->name('system.')->group(function () {
-            Route::get('/health', [AdminController::class, 'systemHealth'])->name('health');
-            Route::get('/logs', [AdminController::class, 'systemLogs'])->name('logs');
             Route::post('/clear-logs', [AdminController::class, 'clearLogs'])->name('clear-logs');
             Route::post('/cache/clear', [AdminController::class, 'clearSystemCache'])->name('clear-cache');
             Route::get('/phpinfo', [AdminController::class, 'phpInfo'])->name('phpinfo');
@@ -435,7 +457,7 @@ Route::middleware(['auth'])->group(function () {
 */
 require __DIR__.'/auth.php';
 
-// Fallback route for 404 errors (must be last)
+// Fallback route for 404 errors
 Route::fallback(function () {
     if (request()->expectsJson()) {
         return response()->json(['success' => false, 'message' => 'Resource not found'], 404);

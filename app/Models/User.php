@@ -602,4 +602,25 @@ class User extends Authenticatable
     {
         return self::where('role', 'admin')->get();
     }
+
+    // Add these relationships
+
+    public function unreadNotifications()
+    {
+        return $this->hasMany(Notification::class)->where('read', false);
+    }
+
+    public function notificationSettings()
+    {
+        return $this->hasOne(NotificationSettings::class);
+    }
+
+    // Method to get notification settings (creates default if doesn't exist)
+    public function getNotificationSettingsAttribute()
+    {
+        return $this->notificationSettings()->firstOrCreate(
+            [],
+            NotificationSettings::getDefaults()
+        );
+    }
 }

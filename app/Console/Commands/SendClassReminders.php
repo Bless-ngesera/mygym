@@ -1,57 +1,134 @@
 <?php
+// app/Console/Commands/SendClassReminders.php
 
 namespace App\Console\Commands;
 
-use App\Mail\ClassReminder;
-use App\Models\Booking;
+use App\Models\ScheduledClass;
+use App\Services\NotificationService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Mail;
-use Symfony\Component\Console\Command\Command as SymfonyCommand;
+use Illuminate\Support\Facades\Log;
 
 class SendClassReminders extends Command
 {
-    protected $signature = 'reminders:send';
-    protected $description = 'Send class reminders to members for classes starting in 2 hours';
+    protected $signature = 'notifications:class-reminders
+                            {--hours=24 : Hours before class to send reminder (24 or 1)}
+                            {--dry-run : Simulate without sending}';
 
-    public function handle(): int
+    protected $description = 'Send class reminders to members and instructors';
+
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
     {
-        $this->info('Sending class reminders...');
+        parent::__construct();
+        $this->notificationService = $notificationService;
+    }
 
-        // Get bookings for classes starting in 2 hours (± 30 minutes)
-        $startTime = Carbon::now()->addHours(2);
-        $endTime = Carbon::now()->addHours(3);
+    public function handle()
+    {
+        $hoursBefore = (int) $this->option('hours');
 
-        $bookings = Booking::with(['scheduledClass.classType', 'scheduledClass.instructor', 'user'])
-            ->whereHas('scheduledClass', function($query) use ($startTime, $endTime) {
-                $query->whereBetween('date_time', [$startTime, $endTime]);
-            })
-            ->get();
-
-        $count = 0;
-        $failed = 0;
-
-        if ($bookings->isEmpty()) {
-            $this->info('No classes found starting in the next 2-3 hours.');
+        if (!in_array($hoursBefore, [1, 24])) {
+            $this->error('Hours must be either 1 or 24');
+            return 1;
         }
 
-        foreach ($bookings as $booking) {
-            try {
-                Mail::to($booking->user->email)->send(new ClassReminder($booking));
-                $count++;
-                $this->info("✓ Reminder sent to: {$booking->user->email} for class at {$booking->scheduledClass->date_time->format('g:i A')}");
-            } catch (\Exception $e) {
-                $failed++;
-                $this->error("✗ Failed to send to: {$booking->user->email} - {$e->getMessage()}");
+        $this->info("Sending {$hoursBefore}-hour class reminders...");
+        $dryRun = $this->option('dry-run');
+
+        // Find classes starting in exactly {$hoursBefore} hours
+        $targetTime = now()->addHours($hoursBefore);
+        $timeWindow = $targetTime->copy()->subMinutes(30);
+
+        $classes = ScheduledClass::whereBetween('date_time', [
+            $timeWindow,
+            $targetTime
+        ])->with(['bookings.user', 'instructor'])->get();
+
+        $this->info("Found {$classes->count()} classes to remind");
+
+        $memberReminders = 0;
+        $instructorReminders = 0;
+        $errors = [];
+
+        foreach ($classes as $class) {
+            // Send reminders to members
+            foreach ($class->bookings as $booking) {
+                if (!$booking->user) continue;
+
+                try {
+                    if (!$dryRun) {
+                        $this->notificationService->classReminder(
+                            $booking->user,
+                            $class,
+                            $hoursBefore
+                        );
+                        $memberReminders++;
+                    }
+
+                    $this->line("Member reminder: {$booking->user->name} - {$class->name}");
+
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'type' => 'member',
+                        'user_id' => $booking->user->id,
+                        'class_id' => $class->id,
+                        'error' => $e->getMessage()
+                    ];
+                }
             }
+
+            // Send reminder to instructor
+            if ($class->instructor) {
+                try {
+                    if (!$dryRun) {
+                        $this->notificationService->classReminder(
+                            $class->instructor,
+                            $class,
+                            $hoursBefore
+                        );
+                        $instructorReminders++;
+                    }
+
+                    $this->line("Instructor reminder: {$class->instructor->name} - {$class->name}");
+
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'type' => 'instructor',
+                        'user_id' => $class->instructor->id,
+                        'class_id' => $class->id,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            // Log for analytics
+            Log::info('Class reminders sent', [
+                'class_id' => $class->id,
+                'class_name' => $class->name,
+                'hours_before' => $hoursBefore,
+                'member_reminders' => $class->bookings->count(),
+                'dry_run' => $dryRun
+            ]);
         }
 
-        $this->info("✅ Sent {$count} reminders.");
+        $this->newLine();
+        $this->table(
+            ['Metric', 'Value'],
+            [
+                ['Total Classes', $classes->count()],
+                ['Member Reminders', $memberReminders],
+                ['Instructor Reminders', $instructorReminders],
+                ['Total Reminders', $memberReminders + $instructorReminders],
+                ['Errors', count($errors)],
+                ['Dry Run', $dryRun ? 'Yes' : 'No']
+            ]
+        );
 
-        if ($failed > 0) {
-            $this->warn("⚠️ Failed to send {$failed} reminders.");
+        if (!empty($errors)) {
+            Log::warning('Class reminder errors', ['errors' => $errors]);
         }
 
-        return SymfonyCommand::SUCCESS;
+        return 0;
     }
 }

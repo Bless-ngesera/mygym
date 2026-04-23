@@ -15,6 +15,11 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\Booking;
 use App\Models\ScheduledClass;
+use App\Services\NotificationService;
+use App\Events\MemberCheckedIn;
+use App\Events\WorkoutCompleted;
+use App\Events\GoalAchieved;
+use App\Events\NewMessageSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +28,13 @@ use Carbon\Carbon;
 
 class MemberDashboardController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function index()
     {
         $user = Auth::user();
@@ -49,7 +61,7 @@ class MemberDashboardController extends Controller
             ->whereDate('date', today())
             ->first();
 
-        // Upcoming workouts (for display)
+        // Upcoming workouts
         $upcomingWorkouts = Workout::where('user_id', $user->id)
             ->whereDate('date', '>', today())
             ->where('status', '!=', 'completed')
@@ -57,52 +69,13 @@ class MemberDashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // Upcoming workouts count (for stats card)
         $upcomingWorkoutsCount = Workout::where('user_id', $user->id)
             ->whereDate('date', '>', today())
             ->where('status', '!=', 'completed')
             ->count();
 
-        // Upcoming classes count - correctly count only future classes the user has booked
-        $upcomingClassesCount = 0;
-        try {
-            // Check if bookings table exists
-            if (Schema::hasTable('bookings')) {
-                // Check if scheduled_classes table exists for joining
-                if (Schema::hasTable('scheduled_classes')) {
-                    // Get count of upcoming classes through the scheduled_classes relationship
-                    $upcomingClassesCount = Booking::where('bookings.user_id', $user->id)
-                        ->where('bookings.status', 'confirmed')
-                        ->join('scheduled_classes', 'bookings.scheduled_class_id', '=', 'scheduled_classes.id')
-                        ->where('scheduled_classes.date_time', '>=', Carbon::now())
-                        ->count();
-                }
-                // Alternative: if bookings has direct date column
-                elseif (Schema::hasColumn('bookings', 'date')) {
-                    $upcomingClassesCount = Booking::where('user_id', $user->id)
-                        ->where('status', 'confirmed')
-                        ->whereDate('date', '>=', today())
-                        ->count();
-                }
-                // Alternative: if bookings has scheduled_date column
-                elseif (Schema::hasColumn('bookings', 'scheduled_date')) {
-                    $upcomingClassesCount = Booking::where('user_id', $user->id)
-                        ->where('status', 'confirmed')
-                        ->whereDate('scheduled_date', '>=', today())
-                        ->count();
-                }
-                // Fallback: count only recent bookings (last 30 days)
-                else {
-                    $upcomingClassesCount = Booking::where('user_id', $user->id)
-                        ->where('status', 'confirmed')
-                        ->where('created_at', '>=', Carbon::now()->subDays(30))
-                        ->count();
-                }
-            }
-        } catch (\Exception $e) {
-            \Log::warning('Error counting upcoming classes: ' . $e->getMessage());
-            $upcomingClassesCount = 0;
-        }
+        // Upcoming classes count
+        $upcomingClassesCount = $this->getUpcomingClassesCount($user);
 
         // Active subscription
         $subscription = MemberSubscription::where('member_id', $user->id)
@@ -139,13 +112,13 @@ class MemberDashboardController extends Controller
         // Notifications
         $unreadNotificationsCount = Notification::where('user_id', $user->id)->where('read', false)->count();
 
-        // Instructor (assigned trainer)
+        // Instructor
         $instructor = null;
         if ($user->instructor_id) {
             $instructor = User::find($user->instructor_id);
         }
 
-        // Recent messages with instructor (ordered by pinned first, then by created_at)
+        // Recent messages
         $recentMessages = collect();
         if ($instructor) {
             $recentMessages = Message::where(function($query) use ($user, $instructor) {
@@ -158,7 +131,7 @@ class MemberDashboardController extends Controller
                 ->get();
         }
 
-        // Workout templates for scheduling
+        // Workout templates
         $workoutTemplates = Workout::where('user_id', $user->id)->where('status', 'completed')->limit(10)->get();
         if ($workoutTemplates->isEmpty()) {
             $workoutTemplates = Workout::where('user_id', $user->id)->limit(5)->get();
@@ -175,13 +148,13 @@ class MemberDashboardController extends Controller
 
         $checkedInToday = Attendance::where('user_id', $user->id)->whereDate('check_in', today())->exists();
 
-        // Available trainers for selection
+        // Available trainers
         $availableTrainers = User::where('role', 'instructor')
             ->where('id', '!=', $user->instructor_id ?? 0)
             ->take(10)
             ->get();
 
-        // Nutrition targets (can be customized per user)
+        // Nutrition targets
         $user_nutrition_targets = [
             'calories' => $user->calorie_target ?? 2500,
             'protein' => $user->protein_target ?? 150,
@@ -189,7 +162,6 @@ class MemberDashboardController extends Controller
             'fat' => $user->fat_target ?? 80
         ];
 
-        // Recent achievements (if you have an achievements table)
         $recentAchievements = collect();
 
         return view('member.dashboard', compact(
@@ -219,6 +191,22 @@ class MemberDashboardController extends Controller
             'user_nutrition_targets',
             'recentAchievements'
         ));
+    }
+
+    private function getUpcomingClassesCount($user)
+    {
+        try {
+            if (Schema::hasTable('bookings') && Schema::hasTable('scheduled_classes')) {
+                return Booking::where('bookings.user_id', $user->id)
+                    ->where('bookings.status', 'confirmed')
+                    ->join('scheduled_classes', 'bookings.scheduled_class_id', '=', 'scheduled_classes.id')
+                    ->where('scheduled_classes.date_time', '>=', Carbon::now())
+                    ->count();
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Error counting upcoming classes: ' . $e->getMessage());
+        }
+        return 0;
     }
 
     private function calculateCurrentStreak()
@@ -303,12 +291,14 @@ class MemberDashboardController extends Controller
             }
         }
 
-        Notification::create([
-            'user_id' => Auth::id(),
-            'type' => 'workout',
-            'title' => 'Workout Scheduled',
+        // Send notification
+        $this->notificationService->sendToUser(Auth::user(), [
+            'type' => 'workout_scheduled',
+            'title' => '📅 Workout Scheduled',
             'message' => 'Your workout "' . $workout->title . '" has been scheduled for ' . $scheduledDateTime->format('M d, h:i A'),
-            'data' => json_encode(['workout_id' => $workout->id])
+            'priority' => 'medium',
+            'action_url' => route('member.workouts.details', $workout->id),
+            'data' => ['workout_id' => $workout->id]
         ]);
 
         return response()->json(['success' => true, 'workout' => $workout]);
@@ -328,15 +318,17 @@ class MemberDashboardController extends Controller
             'duration_minutes' => $duration
         ]);
 
+        // Update goals
         Goal::where('user_id', Auth::id())->where('type', 'workouts')->where('status', 'active')->increment('current_value', 1);
 
-        Notification::create([
-            'user_id' => Auth::id(),
-            'type' => 'workout',
-            'title' => 'Workout Completed! 🎉',
-            'message' => 'Great job completing "' . $workout->title . '" in ' . $duration . ' minutes!',
-            'data' => json_encode(['workout_id' => $workout->id])
-        ]);
+        // Dispatch event for notifications
+        event(new WorkoutCompleted(Auth::user(), $workout));
+
+        // Send notification
+        $this->notificationService->workoutCompleted(Auth::user(), $workout);
+
+        // Check goal progress
+        $this->checkGoalProgress(Auth::user());
 
         return response()->json(['success' => true]);
     }
@@ -367,13 +359,14 @@ class MemberDashboardController extends Controller
 
         $attendance = Attendance::create(['user_id' => $user->id, 'check_in' => now(), 'status' => 'checked_in']);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'attendance',
-            'title' => 'Checked In Successfully',
-            'message' => 'You have checked in at ' . now()->format('h:i A') . '. Have a great workout!',
-            'data' => json_encode(['attendance_id' => $attendance->id])
-        ]);
+        // Calculate current streak
+        $streakCount = $this->calculateCurrentStreak();
+
+        // Dispatch event for notifications
+        event(new MemberCheckedIn($user, $streakCount));
+
+        // Send notification
+        $this->notificationService->checkInConfirmation($user, $streakCount);
 
         return response()->json(['success' => true, 'message' => 'Checked in successfully']);
     }
@@ -389,6 +382,16 @@ class MemberDashboardController extends Controller
             ['user_id' => Auth::id(), 'date' => $validated['date']],
             ['weight_kg' => $validated['weight_kg']]
         );
+
+        // Send notification
+        $this->notificationService->sendToUser(Auth::user(), [
+            'type' => 'weight_logged',
+            'title' => '⚖️ Weight Logged',
+            'message' => 'Your weight of ' . $validated['weight_kg'] . ' kg has been recorded for ' . Carbon::parse($validated['date'])->format('M d, Y'),
+            'priority' => 'low',
+            'action_url' => route('member.progress'),
+            'data' => ['weight' => $validated['weight_kg'], 'date' => $validated['date']]
+        ]);
 
         return response()->json(['success' => true, 'progress' => $progress]);
     }
@@ -414,7 +417,53 @@ class MemberDashboardController extends Controller
             'status' => 'active'
         ]);
 
+        // Send notification
+        $this->notificationService->sendToUser(Auth::user(), [
+            'type' => 'goal_created',
+            'title' => '🎯 New Goal Created',
+            'message' => 'Your goal "' . $goal->title . '" has been created. Target: ' . $goal->target_value . ' ' . $goal->unit,
+            'priority' => 'medium',
+            'action_url' => route('member.goals.index'),
+            'data' => ['goal_id' => $goal->id]
+        ]);
+
         return response()->json(['success' => true, 'goal' => $goal]);
+    }
+
+    private function checkGoalProgress($user)
+    {
+        $goals = Goal::where('user_id', $user->id)->where('status', 'active')->get();
+
+        foreach ($goals as $goal) {
+            $percentage = $this->calculateGoalPercentage($goal);
+            $milestones = [25, 50, 75];
+
+            if (in_array($percentage, $milestones) && !$goal->last_notified_at?->isToday()) {
+                $this->notificationService->sendToUser($user, [
+                    'type' => 'goal_progress',
+                    'title' => '🎯 Goal Progress Update',
+                    'message' => "You're {$percentage}% of the way to your goal: {$goal->title}",
+                    'priority' => 'medium',
+                    'action_url' => route('member.goals.index'),
+                    'data' => ['goal_id' => $goal->id, 'percentage' => $percentage]
+                ]);
+
+                $goal->update(['last_notified_at' => now()]);
+            }
+
+            // Check if goal is achieved
+            if ($goal->current_value >= $goal->target_value && $goal->status === 'active') {
+                $goal->update(['status' => 'completed', 'completed_at' => now()]);
+                event(new GoalAchieved($user, $goal));
+                $this->notificationService->goalAchieved($user, $goal);
+            }
+        }
+    }
+
+    private function calculateGoalPercentage($goal)
+    {
+        if ($goal->target_value <= 0) return 0;
+        return min(100, round(($goal->current_value / $goal->target_value) * 100));
     }
 
     public function addNutrition(Request $request)
@@ -434,6 +483,18 @@ class MemberDashboardController extends Controller
             'fat_grams' => ($nutrition->fat_grams ?? 0) + ($validated['fat_grams'] ?? 0),
         ]);
 
+        // Send notification for meal milestone
+        if ($nutrition->calories >= 2000 && $nutrition->calories - $validated['calories'] < 2000) {
+            $this->notificationService->sendToUser(Auth::user(), [
+                'type' => 'nutrition_milestone',
+                'title' => '🍽️ Nutrition Milestone',
+                'message' => 'You\'ve reached 2000+ calories today! Keep fueling your fitness journey.',
+                'priority' => 'low',
+                'action_url' => route('member.nutrition'),
+                'data' => ['calories' => $nutrition->calories]
+            ]);
+        }
+
         return response()->json(['success' => true, 'nutrition' => $nutrition]);
     }
 
@@ -451,20 +512,19 @@ class MemberDashboardController extends Controller
             'read' => false,
         ]);
 
-        Notification::create([
-            'user_id' => $validated['receiver_id'],
-            'type' => 'message',
-            'title' => 'New Message from ' . Auth::user()->name,
-            'message' => substr($validated['message'], 0, 100),
-            'data' => json_encode(['message_id' => $message->id])
-        ]);
+        // Dispatch event for real-time notification
+        event(new NewMessageSent($message, Auth::user(), User::find($validated['receiver_id'])));
+
+        // Send notification to receiver
+        $this->notificationService->newMessage(
+            User::find($validated['receiver_id']),
+            Auth::user(),
+            $validated['message']
+        );
 
         return response()->json(['success' => true, 'message' => $message]);
     }
 
-    /**
-     * Delete a message
-     */
     public function deleteMessage(Message $message)
     {
         if ($message->sender_id !== Auth::id()) {
@@ -480,9 +540,6 @@ class MemberDashboardController extends Controller
         return redirect()->back()->with('success', 'Message deleted successfully');
     }
 
-    /**
-     * Update a message
-     */
     public function updateMessage(Request $request, Message $message)
     {
         if ($message->sender_id !== Auth::id()) {
@@ -506,12 +563,8 @@ class MemberDashboardController extends Controller
         return redirect()->back()->with('success', 'Message updated successfully');
     }
 
-    /**
-     * Pin/unpin a message
-     */
     public function pinMessage(Message $message)
     {
-        // Both sender and receiver can pin messages
         if ($message->receiver_id !== Auth::id() && $message->sender_id !== Auth::id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
@@ -530,9 +583,6 @@ class MemberDashboardController extends Controller
         return redirect()->back()->with('success', $isPinning ? 'Message pinned' : 'Message unpinned');
     }
 
-    /**
-     * Get messages with instructor (for AJAX)
-     */
     public function getMessages($userId)
     {
         $messages = Message::where(function($query) use ($userId) {
@@ -567,6 +617,7 @@ class MemberDashboardController extends Controller
         $user->instructor_id = $trainer->id;
         $user->save();
 
+        // Send welcome message from trainer
         Message::create([
             'sender_id' => $trainer->id,
             'receiver_id' => $user->id,
@@ -574,13 +625,8 @@ class MemberDashboardController extends Controller
             'read' => false,
         ]);
 
-        Notification::create([
-            'user_id' => $user->id,
-            'type' => 'trainer',
-            'title' => 'New Personal Trainer Assigned',
-            'message' => "{$trainer->name} is now your personal trainer. Send them a message to get started!",
-            'data' => json_encode(['trainer_id' => $trainer->id])
-        ]);
+        // Send notification to member
+        $this->notificationService->instructorAssigned($user, $trainer);
 
         return response()->json(['success' => true]);
     }
@@ -628,9 +674,6 @@ class MemberDashboardController extends Controller
         return response()->json(['success' => true, 'templates' => $templates]);
     }
 
-    /**
-     * AI Chat - Enhanced intelligent responses
-     */
     public function aiChat(Request $request)
     {
         $request->validate([
@@ -640,7 +683,6 @@ class MemberDashboardController extends Controller
         $message = strtolower(trim($request->message));
         $user = Auth::user();
 
-        // Get enhanced AI response
         $response = $this->getEnhancedAIResponse($message, $user);
 
         return response()->json([
@@ -649,9 +691,6 @@ class MemberDashboardController extends Controller
         ]);
     }
 
-    /**
-     * Get enhanced AI response with personalization
-     */
     private function getEnhancedAIResponse($message, $user)
     {
         // Workout related queries
@@ -707,44 +746,6 @@ class MemberDashboardController extends Controller
             $quote = $motivationalQuotes[array_rand($motivationalQuotes)];
 
             return $quote . "\n\nYou've got this, " . ($user->name ?? 'champion') . "! 💪 What specific goal are you working toward right now?";
-        }
-
-        // Progress related queries
-        elseif (str_contains($message, 'progress') || str_contains($message, 'track') || str_contains($message, 'measure') || str_contains($message, 'results')) {
-            return "📊 Track your progress effectively:\n\n• Take photos every 4 weeks\n• Measure weight weekly (same time/day)\n• Track workout weights/reps\n• Measure body parts monthly\n• Note how clothes fit\n• Track energy & mood levels\n• Celebrate non-scale victories!\n\nConsistency > Intensity! Want me to help you set up a tracking system?";
-        }
-
-        // Cardio related
-        elseif (str_contains($message, 'cardio') || str_contains($message, 'running') || str_contains($message, 'walk') || str_contains($message, 'jog')) {
-            return "🏃 Cardio recommendations:\n\n• Beginners: 20 min walking/jogging\n• Intermediate: HIIT 15-20 min\n• Advanced: 45 min running\n• Low impact: Swimming/cycling\n• Fat burning: Fasted morning walk\n\nAim for 150 min moderate or 75 min intense cardio weekly!\n\nWhat's your current fitness level?";
-        }
-
-        // Recovery related
-        elseif (str_contains($message, 'recovery') || str_contains($message, 'rest') || str_contains($message, 'sleep') || str_contains($message, 'sore')) {
-            return "😴 Recovery is crucial! Tips:\n\n• Get 7-9 hours quality sleep\n• Take rest days seriously\n• Stretch dynamically before, statically after\n• Foam roll sore muscles\n• Stay hydrated (add electrolytes)\n• Eat protein within 30 min post-workout\n• Try active recovery (light walking)\n\nYour muscles grow during rest, not during workouts!";
-        }
-
-        // Weight loss related
-        elseif (str_contains($message, 'weight loss') || str_contains($message, 'fat loss') || str_contains($message, 'lose weight')) {
-            return "🎯 For effective weight loss:\n\n• Calorie deficit (500-750 calories/day)\n• High protein intake (preserve muscle)\n• Strength training 3-4x/week\n• NEAT (non-exercise activity)\n• 8-10k steps daily\n• Sleep & stress management\n• Patience (1-2 lbs/week is healthy)\n\nWant a sample meal plan or workout routine for weight loss?";
-        }
-
-        // Muscle building related
-        elseif (str_contains($message, 'muscle') || str_contains($message, 'gain weight') || str_contains($message, 'bulk')) {
-            return "💪 For muscle building:\n\n• Calorie surplus (+300-500 calories)\n• 1.6-2.2g protein per kg body weight\n• Progressive overload in training\n• Compound lifts (squat, deadlift, bench)\n• 6-12 rep range for hypertrophy\n• 7-9 hours sleep for recovery\n• Consistency over perfection\n\nWhat's your current training experience?";
-        }
-
-        // Greetings
-        elseif (str_contains($message, 'hi') || str_contains($message, 'hello') || str_contains($message, 'hey') || str_contains($message, 'good morning') || str_contains($message, 'good evening')) {
-            $time = date('H');
-            $greeting = $time < 12 ? 'Good morning' : ($time < 18 ? 'Good afternoon' : 'Good evening');
-
-            return "👋 {$greeting}, " . ($user->name ?? 'friend') . "! I'm your AI fitness coach. \n\nHow can I help you today?\n\nAsk me about:\n• 💪 Workouts & exercises\n• 🥗 Nutrition & meal ideas\n• 🔥 Motivation & mindset\n• 📊 Progress tracking\n• 🏃 Cardio & recovery\n\nWhat's your fitness goal today?";
-        }
-
-        // Help
-        elseif (str_contains($message, 'help') || str_contains($message, 'what can you do') || str_contains($message, 'commands')) {
-            return "🤖 I can help you with:\n\n💪 WORKOUTS\n• \"Workout for chest\"\n• \"Beginner leg workout\"\n• \"Arm day routine\"\n\n🥗 NUTRITION\n• \"Healthy breakfast ideas\"\n• \"Best protein sources\"\n• \"Meal prep tips\"\n\n🔥 MOTIVATION\n• \"Need motivation\"\n• \"Feeling tired\"\n• \"Stay consistent\"\n\n📊 PROGRESS\n• \"How to track progress\"\n• \"Measure results\"\n\n🏃 CARDIO & RECOVERY\n• \"Cardio routine\"\n• \"Recovery tips\"\n\nWhat would you like to know?";
         }
 
         // Default response

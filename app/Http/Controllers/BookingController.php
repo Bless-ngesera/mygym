@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\ScheduledClass;
 use App\Models\Receipt;
+use App\Models\Notification;
+use App\Services\NotificationService;
+use App\Events\BookingCreated;
+use App\Events\BookingCancelled;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +19,13 @@ use App\Mail\BookingCancellation;
 
 class BookingController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     /**
      * Display a listing of the user's bookings.
      */
@@ -23,7 +34,7 @@ class BookingController extends Controller
         $user = Auth::user();
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can view their bookings.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view their bookings.');
         }
 
         $filter = request('filter', 'upcoming');
@@ -81,7 +92,7 @@ class BookingController extends Controller
         }
 
         if ($user->role !== 'member') {
-            return redirect()->route('dashboard')->with('error', 'Only members can book classes.');
+            return redirect()->route('member.dashboard')->with('error', 'Only members can book classes.');
         }
 
         // Get upcoming classes that the user hasn't booked yet
@@ -95,12 +106,37 @@ class BookingController extends Controller
     }
 
     /**
+     * Show details of a specific class for booking.
+     */
+    public function show($classId)
+    {
+        $user = Auth::user();
+
+        if (!Auth::check()) {
+            return redirect()->route('login')->with('error', 'Please login to view class details.');
+        }
+
+        if ($user->role !== 'member') {
+            return redirect()->route('member.dashboard')->with('error', 'Only members can view class details.');
+        }
+
+        $class = ScheduledClass::with(['classType', 'instructor'])->findOrFail($classId);
+
+        $isBooked = $user->bookings()->where('scheduled_class_id', $classId)->exists();
+        $isPast = $class->date_time->isPast();
+        $isFull = $class->capacity && $class->members()->count() >= $class->capacity;
+        $spotsLeft = $class->capacity ? max(0, $class->capacity - $class->members()->count()) : null;
+
+        return view('member.class-detail', compact('class', 'isBooked', 'isPast', 'isFull', 'spotsLeft'));
+    }
+
+    /**
      * Store a newly created booking and receipt.
      * This handles the POST request from the booking form.
      */
     public function store(Request $request)
     {
-        // Validate the request - expecting scheduled_class_id from the form
+        // Validate the request
         $validated = $request->validate([
             'scheduled_class_id' => 'required|exists:scheduled_classes,id',
             'payment_method' => 'nullable|string|in:MTN Mobile Money,Airtel Money,Card,Cash',
@@ -131,7 +167,7 @@ class BookingController extends Controller
             return redirect()->back()->with('error', 'You have already booked this class.');
         }
 
-        // Check if class is full (if there's a capacity limit)
+        // Check if class is full
         if ($class->capacity && $class->members()->count() >= $class->capacity) {
             return redirect()->back()->with('error', 'This class is fully booked.');
         }
@@ -139,8 +175,7 @@ class BookingController extends Controller
         try {
             DB::beginTransaction();
 
-            // FIXED: Create the booking WITHOUT extra columns (just attach the class)
-            // This works for a standard many-to-many pivot table with only user_id and scheduled_class_id
+            // Create the booking
             $user->bookings()->attach($class->id);
 
             // Generate unique receipt number
@@ -159,6 +194,43 @@ class BookingController extends Controller
             ]);
 
             DB::commit();
+
+            // ==================== NOTIFICATIONS ====================
+
+            // 1. Send in-app notification to member
+            $this->notificationService->sendToUser($user, [
+                'type' => 'booking_confirmed',
+                'title' => '📅 Booking Confirmed!',
+                'message' => "You're booked for {$class->classType->name} on {$class->date_time->format('M d, h:i A')}",
+                'priority' => 'medium',
+                'action_url' => route('member.bookings.index'),
+                'data' => ['class_id' => $class->id]
+            ]);
+
+            // 2. Notify instructor
+            if ($class->instructor) {
+                $this->notificationService->sendToUser($class->instructor, [
+                    'type' => 'new_booking',
+                    'title' => '🎯 New Class Booking!',
+                    'message' => "{$user->name} just booked your {$class->classType->name} class",
+                    'priority' => 'high',
+                    'action_url' => route('instructor.schedule.show', $class->id),
+                    'data' => ['class_id' => $class->id, 'member_id' => $user->id]
+                ]);
+            }
+
+            // 3. Check capacity and notify admin if class is filling up
+            $currentBookings = $class->members()->count();
+            if ($class->capacity && $currentBookings >= $class->capacity * 0.9) {
+                $this->notificationService->sendToAdmins([
+                    'type' => 'class_capacity_alert',
+                    'title' => '⚠️ Class Almost Full!',
+                    'message' => "{$class->classType->name} is at {$currentBookings}/{$class->capacity} capacity",
+                    'priority' => 'medium',
+                    'action_url' => route('admin.classes.show', $class->id),
+                    'data' => ['class_id' => $class->id]
+                ]);
+            }
 
             // Send email confirmation
             $emailSent = false;
@@ -179,7 +251,7 @@ class BookingController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Booking error: ' . $e->getMessage());
-            return redirect()->back()->with('error', '❌ Unable to book class. Please try again. Error: ' . $e->getMessage());
+            return redirect()->back()->with('error', '❌ Unable to book class. Please try again.');
         }
     }
 
@@ -229,6 +301,30 @@ class BookingController extends Controller
             }
 
             DB::commit();
+
+            // ==================== NOTIFICATIONS ====================
+
+            // 1. Send in-app notification to member
+            $this->notificationService->sendToUser($user, [
+                'type' => 'booking_cancelled',
+                'title' => '❌ Booking Cancelled',
+                'message' => "Your booking for {$class->classType->name} on {$class->date_time->format('M d, h:i A')} has been cancelled.",
+                'priority' => 'medium',
+                'action_url' => route('member.bookings.index'),
+                'data' => ['class_id' => $class->id]
+            ]);
+
+            // 2. Notify instructor
+            if ($class->instructor) {
+                $this->notificationService->sendToUser($class->instructor, [
+                    'type' => 'booking_cancelled',
+                    'title' => '📅 Booking Cancelled',
+                    'message' => "{$user->name} cancelled their booking for your {$class->classType->name} class.",
+                    'priority' => 'medium',
+                    'action_url' => route('instructor.schedule.show', $class->id),
+                    'data' => ['class_id' => $class->id, 'member_id' => $user->id]
+                ]);
+            }
 
             // Send cancellation email
             $emailSent = false;
@@ -292,6 +388,26 @@ class BookingController extends Controller
     }
 
     /**
+     * Download receipt as PDF.
+     */
+    public function downloadReceipt($receiptId)
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'member') {
+            return redirect()->back()->with('error', 'Only members can download receipts.');
+        }
+
+        $receipt = Receipt::where('user_id', $user->id)
+            ->where('id', $receiptId)
+            ->with(['scheduledClass.classType', 'scheduledClass.instructor'])
+            ->firstOrFail();
+
+        // For now, redirect to receipt view
+        return redirect()->route('receipts.show', $receiptId);
+    }
+
+    /**
      * Get upcoming bookings only.
      */
     public function upcoming()
@@ -302,15 +418,15 @@ class BookingController extends Controller
             return redirect()->route('member.dashboard')->with('error', 'Only members can view their bookings.');
         }
 
-        $allBookings = $user->bookings()
+        $bookings = $user->bookings()
             ->with(['classType', 'instructor'])
-            ->get();
-
-        $bookings = $allBookings->filter(function($booking) {
-            return $booking->date_time && $booking->date_time->isFuture();
-        })->sortBy(function($booking) {
-            return $booking->date_time;
-        });
+            ->get()
+            ->filter(function($booking) {
+                return $booking->date_time && $booking->date_time->isFuture();
+            })
+            ->sortBy(function($booking) {
+                return $booking->date_time;
+            });
 
         return view('member.upcoming', compact('bookings'));
     }
@@ -326,15 +442,15 @@ class BookingController extends Controller
             return redirect()->route('member.dashboard')->with('error', 'Only members can view their bookings.');
         }
 
-        $allBookings = $user->bookings()
+        $bookings = $user->bookings()
             ->with(['classType', 'instructor'])
-            ->get();
-
-        $bookings = $allBookings->filter(function($booking) {
-            return $booking->date_time && $booking->date_time->isPast();
-        })->sortByDesc(function($booking) {
-            return $booking->date_time;
-        });
+            ->get()
+            ->filter(function($booking) {
+                return $booking->date_time && $booking->date_time->isPast();
+            })
+            ->sortByDesc(function($booking) {
+                return $booking->date_time;
+            });
 
         return view('member.upcoming', compact('bookings'));
     }
@@ -429,6 +545,11 @@ class BookingController extends Controller
         $pastBookings = $allClasses->filter(fn($sc) => $sc->date_time && $sc->date_time->isPast())->count();
         $totalSpent = (float) $user->receipts()->sum('amount');
 
+        // Get upcoming booking for quick access
+        $nextBooking = $allClasses->filter(fn($sc) => $sc->date_time && $sc->date_time->isFuture())
+            ->sortBy(fn($sc) => $sc->date_time)
+            ->first();
+
         return response()->json([
             'success' => true,
             'total_bookings' => $totalBookings,
@@ -436,6 +557,13 @@ class BookingController extends Controller
             'past_bookings' => $pastBookings,
             'total_spent' => $totalSpent,
             'formatted_total_spent' => 'UGX ' . number_format($totalSpent, 0),
+            'next_booking' => $nextBooking ? [
+                'id' => $nextBooking->id,
+                'name' => $nextBooking->classType->name ?? 'Class',
+                'date_time' => $nextBooking->date_time->format('Y-m-d H:i:s'),
+                'formatted_date' => $nextBooking->date_time->format('M d, Y \a\t h:i A'),
+                'instructor' => $nextBooking->instructor->name ?? 'TBA'
+            ] : null,
         ]);
     }
 }

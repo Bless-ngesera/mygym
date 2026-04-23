@@ -33,13 +33,6 @@
                         class="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm w-64 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 focus:bg-white transition-all duration-200 placeholder-gray-400"/>
                 </div>
 
-                <button class="relative p-2.5 rounded-xl hover:bg-gray-100 transition-all duration-200 border border-transparent hover:border-gray-200">
-                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                    </svg>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-                </button>
-
                 <div class="flex items-center space-x-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl transition-all duration-200 cursor-pointer">
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name ?? 'Admin') }}&background=4F46E5&color=fff&bold=true"
                         alt="Avatar" class="w-8 h-8 rounded-lg ring-2 ring-indigo-200">

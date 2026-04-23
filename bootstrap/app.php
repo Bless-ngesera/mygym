@@ -5,7 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\CheckUserRole;
 use App\Http\Middleware\SetLocale;
-use App\Http\Middleware\RateLimitChat; // Add this
+use App\Http\Middleware\RateLimitChat;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -36,7 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'role' => CheckUserRole::class,
             'setlocale' => SetLocale::class,
-            'chat.rate.limit' => RateLimitChat::class, // Add chat rate limiting alias
+            'chat.rate.limit' => RateLimitChat::class,
         ]);
 
         // Global middleware (runs for every request)
@@ -51,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         ]);
 
-        // Web middleware group (standard Laravel web middleware)
+        // Web middleware group
         $middleware->web(append: [
             SetLocale::class,
         ]);
@@ -75,7 +75,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 
-        // Priority middleware (order matters - CSRF removed from priority as it's handled in web group)
+        // Priority middleware (order matters)
         $middleware->priority([
             \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
@@ -123,7 +123,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 403);
             }
 
-            // Don't redirect back if it's an API request
             if ($request->is('api/*')) {
                 return response()->json([
                     'success' => false,
@@ -158,7 +157,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Reportable exceptions
         $exceptions->reportable(function (Throwable $e) {
-            // Only log non-validation exceptions
             if (!$e instanceof \Illuminate\Validation\ValidationException) {
                 \Illuminate\Support\Facades\Log::error('Exception: ' . $e->getMessage(), [
                     'file' => $e->getFile(),
@@ -166,7 +164,6 @@ return Application::configure(basePath: dirname(__DIR__))
                     'trace' => $e->getTraceAsString()
                 ]);
 
-                // Send to Sentry if configured (optional)
                 if (app()->bound('sentry')) {
                     app('sentry')->captureException($e);
                 }
@@ -190,54 +187,137 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule): void {
-        // Send class reminders for classes in 2 hours (every 30 minutes)
+        // ==================== NOTIFICATION COMMANDS ====================
+
+        // Workout reminders - every hour (2 hours before workout)
+        $schedule->command('notifications:workout-reminders --hours=2')
+            ->hourly()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-workout.log'));
+
+        // Class reminders - 24 hours before (daily at 9 AM)
+        $schedule->command('notifications:class-reminders --hours=24')
+            ->dailyAt('09:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-class-24h.log'));
+
+        // Class reminders - 1 hour before (every hour)
+        $schedule->command('notifications:class-reminders --hours=1')
+            ->hourlyAt(0) // Run at minute 0 of every hour
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-class-1h.log'));
+
+        // Daily motivation - every day at 6 AM
+        $schedule->command('notifications:daily-motivation')
+            ->dailyAt('06:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-motivation.log'));
+
+        // Weekly reports - every Sunday at 8 PM
+        $schedule->command('notifications:weekly-reports')
+            ->sundays()
+            ->at('20:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-reports.log'));
+
+        // Check expiring subscriptions - daily at 9 AM
+        $schedule->command('notifications:check-subscriptions --days=30')
+            ->dailyAt('09:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-subscriptions.log'));
+
+        // Streak reminders - daily at 7 PM
+        $schedule->command('notifications:streak-reminders')
+            ->dailyAt('19:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-streak.log'));
+
+        // Clean expired notifications - daily at 2 AM
+        $schedule->command('notifications:clean --days=30 --force')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-clean.log'));
+
+        // Process pending push notifications - every 30 minutes
+        $schedule->command('notifications:process-push --limit=100')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/notifications-push.log'));
+
+        // ==================== SYSTEM MAINTENANCE COMMANDS ====================
+
+        // Cache cleanup (every 6 hours)
+        $schedule->command('cache:prune-stale-tags')
+            ->everySixHours()
+            ->withoutOverlapping()
+            ->runInBackground();
+
+        // Clean up old logs weekly (Sundays at 2 AM)
+        $schedule->command('log:clear')
+            ->weekly()
+            ->sundays()
+            ->at('02:00')
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/log-cleanup.log'));
+
+        // Clean up old session files (hourly)
+        $schedule->command('session:clean')
+            ->hourly()
+            ->withoutOverlapping()
+            ->runInBackground();
+
+        // ==================== PRODUCTION-ONLY COMMANDS ====================
+
         if (app()->environment('production')) {
-            $schedule->command('reminders:send')
-                ->everyThirtyMinutes()
-                ->withoutOverlapping()
-                ->runInBackground()
-                ->appendOutputTo(storage_path('logs/reminders.log'));
+            // Database backup (daily at 1 AM) - only if backup command exists
+            try {
+                $schedule->command('backup:run --only-db')
+                    ->dailyAt('01:00')
+                    ->withoutOverlapping()
+                    ->runInBackground()
+                    ->appendOutputTo(storage_path('logs/backup.log'));
+            } catch (\Exception $e) {
+                // Backup command not available, skip
+            }
 
-            // Send reminders for tomorrow's classes (daily at 8 PM)
-            $schedule->command('reminders:tomorrow')
-                ->dailyAt('20:00')
-                ->withoutOverlapping()
-                ->appendOutputTo(storage_path('logs/tomorrow-reminders.log'));
-
-            // Clean up old logs weekly (Sundays at 2 AM)
-            $schedule->command('log:clear')
-                ->weekly()
-                ->sundays()
-                ->at('02:00')
+            // Queue worker restart (daily at 3 AM)
+            $schedule->command('queue:restart')
+                ->dailyAt('03:00')
                 ->withoutOverlapping();
 
-            // Check and notify about expiring subscriptions daily at 10 AM
-            $schedule->command('subscriptions:check-expiring')
-                ->dailyAt('10:00')
-                ->withoutOverlapping();
+            // Telescope prune (daily at 4 AM) - if using Telescope
+            if (class_exists(\Laravel\Telescope\Telescope::class)) {
+                $schedule->command('telescope:prune')
+                    ->dailyAt('04:00')
+                    ->withoutOverlapping();
+            }
 
-            // Clean up old session files (every hour) - only if using file driver
-            $schedule->command('session:clean')
-                ->hourly()
-                ->withoutOverlapping();
-
-            // Cache cleanup (every 6 hours)
-            $schedule->command('cache:prune-stale-tags')
-                ->everySixHours()
-                ->withoutOverlapping();
-
-            // Database backup (daily at 1 AM)
-            $schedule->command('backup:run --only-db')
-                ->dailyAt('01:00')
-                ->withoutOverlapping()
-                ->appendOutputTo(storage_path('logs/backup.log'));
+            // Horizon snapshot (every 5 minutes) - if using Horizon
+            if (class_exists(\Laravel\Horizon\Horizon::class)) {
+                $schedule->command('horizon:snapshot')
+                    ->everyFiveMinutes()
+                    ->withoutOverlapping();
+            }
         }
 
-        // Run maintenance tasks in local environment too
+        // ==================== LOCAL DEVELOPMENT COMMANDS ====================
+
         if (app()->environment('local')) {
-            $schedule->command('cache:prune-stale-tags')
-                ->everySixHours()
-                ->withoutOverlapping();
+            // Run notification tests daily at noon (dry run)
+            $schedule->command('notifications:daily-motivation --role=admin --dry-run')
+                ->dailyAt('12:00')
+                ->withoutOverlapping()
+                ->appendOutputTo(storage_path('logs/notifications-test.log'));
         }
     })
     ->create();
