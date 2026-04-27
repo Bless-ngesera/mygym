@@ -91,7 +91,7 @@
             </div>
 
             <div style="text-align: center;">
-                <a href="{{ route('member.classes') }}" class="button">Explore Classes</a>
+                <a href="{{ route('member.classes.index') }}" class="button">Explore Classes</a>
             </div>
 
             <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin-top: 20px;">

@@ -35,12 +35,16 @@
             border: none;
             cursor: pointer;
         }
-        .register-btn:hover {
+        .register-btn:hover:not(:disabled) {
             background: linear-gradient(135deg, #1e293b 0%, #7e22ce 100%);
             box-shadow: 0 20px 25px -5px rgba(126, 34, 206, 0.4);
             transform: translateY(-2px);
         }
-        .register-btn:active { transform: translateY(0); }
+        .register-btn:active:not(:disabled) { transform: translateY(0); }
+        .register-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
 
         .card-wrap {
             transition: box-shadow 0.2s, transform 0.2s;
@@ -78,7 +82,44 @@
             align-items: center;
             pointer-events: none;
         }
+
+        /* Toast notification styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .toast {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 280px;
+            animation: slideIn 0.3s ease-out;
+            border-left: 4px solid;
+        }
+        .toast-success { border-left-color: #10b981; }
+        .toast-error { border-left-color: #ef4444; }
+        .toast-warning { border-left-color: #f59e0b; }
+        .toast-info { border-left-color: #3b82f6; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
     </style>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <!-- Background Image -->
     <div class="fixed inset-0 bg-cover bg-center"
@@ -87,11 +128,11 @@
     <!-- Simple dark overlay -->
     <div class="fixed inset-0 bg-black/30"></div>
 
-    <!-- Centered Content - EXACT SAME WIDTH AS LOGIN PAGE (max-w-md) -->
+    <!-- Centered Content -->
     <div class="relative flex items-center justify-center min-h-screen px-4">
         <div class="card-glass card-wrap rounded-2xl p-8 w-full max-w-md">
 
-            {{-- Brand - Logo (EXACT SAME AS LOGIN PAGE) --}}
+            {{-- Brand - Logo --}}
             <div class="text-center mb-8">
                 <div class="flex justify-center mb-3">
                     <img src="{{ asset('images/Project_Logo.png') }}"
@@ -103,27 +144,21 @@
                 </p>
             </div>
 
-            <!-- Validation Errors -->
-            @if ($errors->any())
-                <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
-                    <div class="flex items-center gap-2 mb-1">
-                        <svg class="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <span class="text-xs font-semibold text-red-700">Please fix the following errors:</span>
-                    </div>
-                    <ul class="list-disc list-inside text-xs text-red-600">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+            <!-- Validation Errors Display -->
+            <div id="errorContainer" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <div class="flex items-center gap-2 mb-1">
+                    <svg class="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-xs font-semibold text-red-700">Please fix the following errors:</span>
                 </div>
-            @endif
+                <ul id="errorList" class="list-disc list-inside text-xs text-red-600"></ul>
+            </div>
 
-            <form method="POST" action="{{ route('register') }}">
+            <form id="registerForm" method="POST" action="{{ route('register') }}">
                 @csrf
 
-                <!-- Name - SAME SPACING AS LOGIN PAGE -->
+                <!-- Name -->
                 <div class="mb-4">
                     <label for="name" class="block label-text mb-1.5">Full Name</label>
                     <div class="relative">
@@ -143,9 +178,10 @@
                             autocomplete="name"
                             placeholder="Blessing Ngesera" />
                     </div>
+                    <div id="nameError" class="text-xs text-red-500 mt-1 hidden"></div>
                 </div>
 
-                <!-- Email Address - SAME SPACING AS LOGIN PAGE -->
+                <!-- Email Address -->
                 <div class="mb-4">
                     <label for="email" class="block label-text mb-1.5">Email Address</label>
                     <div class="relative">
@@ -164,9 +200,10 @@
                             autocomplete="username"
                             placeholder="blessingngesera@email.com" />
                     </div>
+                    <div id="emailError" class="text-xs text-red-500 mt-1 hidden"></div>
                 </div>
 
-                <!-- Password - SAME SPACING AS LOGIN PAGE -->
+                <!-- Password -->
                 <div class="mb-4">
                     <label for="password" class="block label-text mb-1.5">Password</label>
                     <div class="relative">
@@ -185,9 +222,10 @@
                             placeholder="••••••••" />
                     </div>
                     <p class="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
+                    <div id="passwordError" class="text-xs text-red-500 mt-1 hidden"></div>
                 </div>
 
-                <!-- Confirm Password - SAME SPACING AS LOGIN PAGE -->
+                <!-- Confirm Password -->
                 <div class="mb-5">
                     <label for="password_confirmation" class="block label-text mb-1.5">Confirm Password</label>
                     <div class="relative">
@@ -205,9 +243,10 @@
                             autocomplete="new-password"
                             placeholder="••••••••" />
                     </div>
+                    <div id="confirmPasswordError" class="text-xs text-red-500 mt-1 hidden"></div>
                 </div>
 
-                <!-- Terms - SAME SPACING AS REMEMBER ME ON LOGIN PAGE -->
+                <!-- Terms -->
                 <div class="flex items-start mb-6">
                     <input type="checkbox" id="terms" name="terms" required
                            class="mt-1 w-4 h-4 rounded border-gray-300 text-purple-700 focus:ring-purple-300">
@@ -217,20 +256,20 @@
                     </label>
                 </div>
 
-                <!-- Register Button - SAME AS LOGIN BUTTON -->
-                <button type="submit"
+                <!-- Register Button -->
+                <button type="submit" id="registerBtn"
                         class="register-btn w-full py-2.5 text-white text-sm font-semibold rounded-xl tracking-wide uppercase">
                     Create Account
                 </button>
 
-                <!-- Login Link - SAME AS LOGIN PAGE STYLING -->
+                <!-- Login Link -->
                 <p class="mt-5 text-center text-sm text-gray-600">
                     Already have an account?
                     <a href="{{ route('login') }}" class="login-link ml-1 font-semibold">Sign in →</a>
                 </p>
             </form>
 
-            {{-- Footer - EXACT SAME AS LOGIN PAGE --}}
+            {{-- Footer --}}
             <div class="mt-7 pt-5 border-t divider-line text-center">
                 <div class="flex justify-center gap-6 mb-3">
                     <a href="#" class="text-xs text-gray-400 hover:text-purple-600 transition-colors">About</a>
@@ -244,4 +283,341 @@
             </div>
         </div>
     </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const form = document.getElementById('registerForm');
+            const registerBtn = document.getElementById('registerBtn');
+            const errorContainer = document.getElementById('errorContainer');
+            const errorList = document.getElementById('errorList');
+
+            // Individual error elements
+            const nameError = document.getElementById('nameError');
+            const emailError = document.getElementById('emailError');
+            const passwordError = document.getElementById('passwordError');
+            const confirmPasswordError = document.getElementById('confirmPasswordError');
+
+            // Helper: Show toast notification
+            function showToast(message, type = 'error') {
+                const container = document.getElementById('toastContainer');
+                if (!container) return;
+
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+
+                const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚠';
+                const iconColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#f59e0b';
+
+                toast.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2">
+                        ${type === 'success' ? '<path d="M20 6L9 17l-5-5"/>' :
+                          type === 'error' ? '<path d="M6 18L18 6M6 6l12 12"/>' :
+                          '<path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'}
+                    </svg>
+                    <span style="color: #1f2937; font-size: 14px; font-weight: 500;">${escapeHtml(message)}</span>
+                    <button onclick="this.parentElement.remove()" style="margin-left: auto; background: none; border: none; cursor: pointer; color: #9ca3af;">✕</button>
+                `;
+
+                container.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.style.animation = 'fadeOut 0.3s ease-out forwards';
+                    setTimeout(() => toast.remove(), 300);
+                }, 5000);
+            }
+
+            // Helper: Escape HTML
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/[&<>]/g, function(m) {
+                    if (m === '&') return '&amp;';
+                    if (m === '<') return '&lt;';
+                    if (m === '>') return '&gt;';
+                    return m;
+                });
+            }
+
+            // Helper: Clear all errors
+            function clearErrors() {
+                errorContainer.classList.add('hidden');
+                errorList.innerHTML = '';
+
+                const errorDivs = [nameError, emailError, passwordError, confirmPasswordError];
+                errorDivs.forEach(div => {
+                    if (div) {
+                        div.classList.add('hidden');
+                        div.textContent = '';
+                    }
+                });
+            }
+
+            // Helper: Display validation errors
+            function displayErrors(errors) {
+                clearErrors();
+
+                const errorMessages = [];
+
+                for (const [field, messages] of Object.entries(errors)) {
+                    const message = messages[0];
+                    errorMessages.push(message);
+
+                    // Display individual field errors
+                    switch(field) {
+                        case 'name':
+                            if (nameError) {
+                                nameError.textContent = message;
+                                nameError.classList.remove('hidden');
+                            }
+                            break;
+                        case 'email':
+                            if (emailError) {
+                                emailError.textContent = message;
+                                emailError.classList.remove('hidden');
+                            }
+                            break;
+                        case 'password':
+                            if (passwordError) {
+                                passwordError.textContent = message;
+                                passwordError.classList.remove('hidden');
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+
+                // Display in error container
+                if (errorMessages.length > 0) {
+                    errorMessages.forEach(msg => {
+                        const li = document.createElement('li');
+                        li.textContent = msg;
+                        errorList.appendChild(li);
+                    });
+                    errorContainer.classList.remove('hidden');
+                }
+            }
+
+            // Real-time password match validation
+            const passwordInput = document.getElementById('password');
+            const confirmPasswordInput = document.getElementById('password_confirmation');
+
+            function validatePasswordMatch() {
+                const password = passwordInput?.value || '';
+                const confirm = confirmPasswordInput?.value || '';
+
+                if (confirm && password !== confirm) {
+                    if (confirmPasswordError) {
+                        confirmPasswordError.textContent = 'Passwords do not match';
+                        confirmPasswordError.classList.remove('hidden');
+                    }
+                    return false;
+                } else {
+                    if (confirmPasswordError) {
+                        confirmPasswordError.classList.add('hidden');
+                    }
+                    return true;
+                }
+            }
+
+            if (confirmPasswordInput) {
+                confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+            }
+            if (passwordInput) {
+                passwordInput.addEventListener('input', validatePasswordMatch);
+            }
+
+            // Real-time email format validation
+            const emailInput = document.getElementById('email');
+            function validateEmailFormat() {
+                const email = emailInput?.value || '';
+                const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+
+                if (email && !emailRegex.test(email)) {
+                    if (emailError) {
+                        emailError.textContent = 'Please enter a valid email address';
+                        emailError.classList.remove('hidden');
+                    }
+                    return false;
+                } else {
+                    if (emailError) {
+                        emailError.classList.add('hidden');
+                    }
+                    return true;
+                }
+            }
+
+            if (emailInput) {
+                emailInput.addEventListener('input', validateEmailFormat);
+            }
+
+            // Real-time name validation
+            const nameInput = document.getElementById('name');
+            function validateName() {
+                const name = nameInput?.value?.trim() || '';
+
+                if (name && name.length < 2) {
+                    if (nameError) {
+                        nameError.textContent = 'Name must be at least 2 characters';
+                        nameError.classList.remove('hidden');
+                    }
+                    return false;
+                } else {
+                    if (nameError) {
+                        nameError.classList.add('hidden');
+                    }
+                    return true;
+                }
+            }
+
+            if (nameInput) {
+                nameInput.addEventListener('input', validateName);
+            }
+
+            // Real-time password strength validation
+            function validatePasswordStrength() {
+                const password = passwordInput?.value || '';
+
+                if (password && password.length < 8) {
+                    if (passwordError) {
+                        passwordError.textContent = 'Password must be at least 8 characters';
+                        passwordError.classList.remove('hidden');
+                    }
+                    return false;
+                } else {
+                    if (passwordError) {
+                        passwordError.classList.add('hidden');
+                    }
+                    return true;
+                }
+            }
+
+            if (passwordInput) {
+                passwordInput.addEventListener('input', validatePasswordStrength);
+            }
+
+            // Form submission with AJAX for better UX
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                clearErrors();
+
+                // Validate terms checkbox
+                const termsCheckbox = document.getElementById('terms');
+                if (!termsCheckbox.checked) {
+                    showToast('Please agree to the Terms of Service and Privacy Policy', 'warning');
+                    return;
+                }
+
+                // Validate all fields
+                const isNameValid = validateName();
+                const isEmailValid = validateEmailFormat();
+                const isPasswordValid = validatePasswordStrength();
+                const isPasswordMatchValid = validatePasswordMatch();
+
+                if (!isNameValid || !isEmailValid || !isPasswordValid || !isPasswordMatchValid) {
+                    showToast('Please fix the errors before submitting', 'error');
+                    return;
+                }
+
+                // Disable button and show loading state
+                const originalButtonText = registerBtn.innerHTML;
+                registerBtn.disabled = true;
+                registerBtn.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                `;
+
+                try {
+                    // Collect form data
+                    const formData = new FormData(form);
+
+                    // Submit via fetch
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || '',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success !== false) {
+                        // Registration successful
+                        showToast('Account created successfully! Redirecting...', 'success');
+
+                        // If there's a redirect URL in response, use it
+                        if (data.redirect) {
+                            setTimeout(() => {
+                                window.location.href = data.redirect;
+                            }, 1500);
+                        } else {
+                            // Default redirect to member dashboard
+                            setTimeout(() => {
+                                window.location.href = '{{ route("member.dashboard") }}';
+                            }, 1500);
+                        }
+                    } else {
+                        // Handle validation errors
+                        if (data.errors) {
+                            displayErrors(data.errors);
+                            showToast('Please fix the errors and try again', 'error');
+                        } else if (data.message) {
+                            showToast(data.message, 'error');
+                        } else {
+                            showToast('Registration failed. Please try again.', 'error');
+                        }
+                        registerBtn.disabled = false;
+                        registerBtn.innerHTML = originalButtonText;
+                    }
+                } catch (error) {
+                    console.error('Registration error:', error);
+
+                    // Fallback to traditional form submission if AJAX fails
+                    // This handles cases where JavaScript fails or CSRF token issues
+                    const tempForm = document.createElement('form');
+                    tempForm.method = 'POST';
+                    tempForm.action = form.action;
+
+                    // Copy all form data
+                    const formData = new FormData(form);
+                    for (let [key, value] of formData.entries()) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        tempForm.appendChild(input);
+                    }
+
+                    document.body.appendChild(tempForm);
+                    tempForm.submit();
+                }
+            });
+
+            // CSRF token refresh utility
+            async function refreshCsrfToken() {
+                try {
+                    const response = await fetch('/csrf-token', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await response.json();
+                    if (data.token) {
+                        const tokenInput = document.querySelector('input[name="_token"]');
+                        if (tokenInput) tokenInput.value = data.token;
+                    }
+                } catch (e) {
+                    console.log('CSRF refresh not available, using existing token');
+                }
+            }
+
+            // Optional: Refresh token periodically if page is idle for long
+            // setInterval(refreshCsrfToken, 15 * 60 * 1000);
+        })();
+    </script>
 </x-guest-layout>

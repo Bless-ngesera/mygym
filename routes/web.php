@@ -200,13 +200,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/select-trainer', [MemberDashboardController::class, 'selectTrainer'])->name('select-trainer');
         Route::get('/chat-messages/{trainerId}', [MemberDashboardController::class, 'getChatMessages'])->name('chat.messages');
 
-        // Message routes
+        // MESSAGE ROUTES (Member specific - using MemberDashboardController)
         Route::prefix('messages')->name('messages.')->group(function () {
-            Route::post('/send', [MemberDashboardController::class, 'sendMessage'])->name('send');
-            Route::get('/{userId}', [MemberDashboardController::class, 'getMessages'])->name('get');
-            Route::delete('/{message}', [MemberDashboardController::class, 'deleteMessage'])->name('delete');
-            Route::put('/{message}', [MemberDashboardController::class, 'updateMessage'])->name('update');
-            Route::post('/{message}/pin', [MemberDashboardController::class, 'pinMessage'])->name('pin');
+            Route::get('/conversation/{trainerId}', [MemberDashboardController::class, 'getConversation'])->name('conversation');
+            Route::post('/send', [MemberDashboardController::class, 'sendMessageToTrainer'])->name('send');
+            Route::put('/{messageId}', [MemberDashboardController::class, 'updateMessage'])->name('update');
+            Route::delete('/{messageId}', [MemberDashboardController::class, 'deleteMessage'])->name('delete');
+            Route::post('/{messageId}/pin', [MemberDashboardController::class, 'pinMessage'])->name('pin');
         });
 
         // Attendance routes
@@ -268,6 +268,19 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/dashboard', [InstructorDashboardController::class, 'index'])->name('dashboard');
 
+        // Instructor Messages view
+        Route::get('/messages', [MessageController::class, 'instructorConversations'])->name('messages.index');
+
+        // INSTRUCTOR MESSAGE ROUTES (using MessageController for instructors)
+        Route::prefix('messages')->name('messages.')->group(function () {
+            Route::get('/conversation/{memberId}', [MessageController::class, 'getConversation'])->name('conversation');
+            Route::post('/send', [MessageController::class, 'sendMessage'])->name('send');
+            Route::put('/{messageId}', [MessageController::class, 'updateMessage'])->name('update');
+            Route::delete('/{messageId}', [MessageController::class, 'deleteMessage'])->name('delete');
+            Route::post('/{messageId}/pin', [MessageController::class, 'pinMessage'])->name('pin');
+            Route::get('/unread-count', [MessageController::class, 'getUnreadCount'])->name('unread-count');
+        });
+
         // Notification routes for instructors
         Route::prefix('notifications')->name('notifications.')->group(function () {
             Route::get('/', [NotificationController::class, 'index'])->name('index');
@@ -277,18 +290,6 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear-all');
             Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
             Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
-        });
-
-        // Message routes
-        Route::prefix('messages')->name('messages.')->group(function () {
-            Route::get('/conversation/{userId}', [InstructorDashboardController::class, 'getConversation'])->name('conversation');
-            Route::post('/send', [InstructorDashboardController::class, 'sendMessage'])->name('send');
-            Route::delete('/{message}', [InstructorDashboardController::class, 'deleteMessage'])->name('delete');
-            Route::put('/{message}', [InstructorDashboardController::class, 'updateMessage'])->name('update');
-            Route::post('/{message}/pin', [InstructorDashboardController::class, 'pinMessage'])->name('pin');
-            Route::get('/members', [InstructorDashboardController::class, 'getMembers'])->name('members');
-            Route::get('/unread-count', [InstructorDashboardController::class, 'getUnreadCount'])->name('unread-count');
-            Route::post('/mark-read/{memberId}', [InstructorDashboardController::class, 'markConversationAsRead'])->name('mark-read');
         });
 
         // Upcoming classes

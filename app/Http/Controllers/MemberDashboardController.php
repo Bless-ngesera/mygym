@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class MemberDashboardController extends Controller
@@ -126,6 +127,13 @@ class MemberDashboardController extends Controller
                 })->orWhere(function($query) use ($user, $instructor) {
                     $query->where('sender_id', $instructor->id)->where('receiver_id', $user->id);
                 })
+                ->where(function($query) use ($user) {
+                    $query->where(function($q) use ($user) {
+                        $q->where('is_deleted_by_sender', 0)->orWhere('sender_id', '!=', $user->id);
+                    })->where(function($q) use ($user) {
+                        $q->where('is_deleted_by_receiver', 0)->orWhere('receiver_id', '!=', $user->id);
+                    });
+                })
                 ->orderBy('is_pinned', 'desc')
                 ->orderBy('created_at', 'asc')
                 ->get();
@@ -204,7 +212,7 @@ class MemberDashboardController extends Controller
                     ->count();
             }
         } catch (\Exception $e) {
-            \Log::warning('Error counting upcoming classes: ' . $e->getMessage());
+            Log::warning('Error counting upcoming classes: ' . $e->getMessage());
         }
         return 0;
     }
@@ -252,6 +260,8 @@ class MemberDashboardController extends Controller
         return round((($lastMonth - $previousMonth) / $previousMonth) * 100);
     }
 
+    // ==================== WORKOUT METHODS ====================
+
     public function scheduleWorkout(Request $request)
     {
         $validated = $request->validate([
@@ -291,7 +301,6 @@ class MemberDashboardController extends Controller
             }
         }
 
-        // Send notification
         $this->notificationService->sendToUser(Auth::user(), [
             'type' => 'workout_scheduled',
             'title' => '📅 Workout Scheduled',
@@ -318,16 +327,10 @@ class MemberDashboardController extends Controller
             'duration_minutes' => $duration
         ]);
 
-        // Update goals
         Goal::where('user_id', Auth::id())->where('type', 'workouts')->where('status', 'active')->increment('current_value', 1);
 
-        // Dispatch event for notifications
         event(new WorkoutCompleted(Auth::user(), $workout));
-
-        // Send notification
         $this->notificationService->workoutCompleted(Auth::user(), $workout);
-
-        // Check goal progress
         $this->checkGoalProgress(Auth::user());
 
         return response()->json(['success' => true]);
@@ -345,288 +348,6 @@ class MemberDashboardController extends Controller
         if ($allCompleted && $workoutExercise->workout->status !== 'completed') {
             $this->completeWorkout($workoutExercise->workout);
         }
-
-        return response()->json(['success' => true]);
-    }
-
-    public function checkIn()
-    {
-        $user = Auth::user();
-        $existing = Attendance::where('user_id', $user->id)->whereDate('check_in', today())->whereNull('check_out')->first();
-        if ($existing) {
-            return response()->json(['error' => 'You are already checked in'], 400);
-        }
-
-        $attendance = Attendance::create(['user_id' => $user->id, 'check_in' => now(), 'status' => 'checked_in']);
-
-        // Calculate current streak
-        $streakCount = $this->calculateCurrentStreak();
-
-        // Dispatch event for notifications
-        event(new MemberCheckedIn($user, $streakCount));
-
-        // Send notification
-        $this->notificationService->checkInConfirmation($user, $streakCount);
-
-        return response()->json(['success' => true, 'message' => 'Checked in successfully']);
-    }
-
-    public function addProgress(Request $request)
-    {
-        $validated = $request->validate([
-            'weight_kg' => 'required|numeric|min:20|max:300',
-            'date' => 'required|date'
-        ]);
-
-        $progress = ProgressLog::updateOrCreate(
-            ['user_id' => Auth::id(), 'date' => $validated['date']],
-            ['weight_kg' => $validated['weight_kg']]
-        );
-
-        // Send notification
-        $this->notificationService->sendToUser(Auth::user(), [
-            'type' => 'weight_logged',
-            'title' => '⚖️ Weight Logged',
-            'message' => 'Your weight of ' . $validated['weight_kg'] . ' kg has been recorded for ' . Carbon::parse($validated['date'])->format('M d, Y'),
-            'priority' => 'low',
-            'action_url' => route('member.progress'),
-            'data' => ['weight' => $validated['weight_kg'], 'date' => $validated['date']]
-        ]);
-
-        return response()->json(['success' => true, 'progress' => $progress]);
-    }
-
-    public function createGoal(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'type' => 'required|string|in:weight_loss,muscle_gain,endurance,strength,workouts,attendance,nutrition',
-            'target_value' => 'required|numeric|min:1',
-            'unit' => 'nullable|string|max:50',
-            'target_date' => 'required|date|after:today'
-        ]);
-
-        $goal = Goal::create([
-            'user_id' => Auth::id(),
-            'title' => $validated['title'],
-            'type' => $validated['type'],
-            'target_value' => $validated['target_value'],
-            'current_value' => 0,
-            'unit' => $validated['unit'] ?? 'units',
-            'target_date' => $validated['target_date'],
-            'status' => 'active'
-        ]);
-
-        // Send notification
-        $this->notificationService->sendToUser(Auth::user(), [
-            'type' => 'goal_created',
-            'title' => '🎯 New Goal Created',
-            'message' => 'Your goal "' . $goal->title . '" has been created. Target: ' . $goal->target_value . ' ' . $goal->unit,
-            'priority' => 'medium',
-            'action_url' => route('member.goals.index'),
-            'data' => ['goal_id' => $goal->id]
-        ]);
-
-        return response()->json(['success' => true, 'goal' => $goal]);
-    }
-
-    private function checkGoalProgress($user)
-    {
-        $goals = Goal::where('user_id', $user->id)->where('status', 'active')->get();
-
-        foreach ($goals as $goal) {
-            $percentage = $this->calculateGoalPercentage($goal);
-            $milestones = [25, 50, 75];
-
-            if (in_array($percentage, $milestones) && !$goal->last_notified_at?->isToday()) {
-                $this->notificationService->sendToUser($user, [
-                    'type' => 'goal_progress',
-                    'title' => '🎯 Goal Progress Update',
-                    'message' => "You're {$percentage}% of the way to your goal: {$goal->title}",
-                    'priority' => 'medium',
-                    'action_url' => route('member.goals.index'),
-                    'data' => ['goal_id' => $goal->id, 'percentage' => $percentage]
-                ]);
-
-                $goal->update(['last_notified_at' => now()]);
-            }
-
-            // Check if goal is achieved
-            if ($goal->current_value >= $goal->target_value && $goal->status === 'active') {
-                $goal->update(['status' => 'completed', 'completed_at' => now()]);
-                event(new GoalAchieved($user, $goal));
-                $this->notificationService->goalAchieved($user, $goal);
-            }
-        }
-    }
-
-    private function calculateGoalPercentage($goal)
-    {
-        if ($goal->target_value <= 0) return 0;
-        return min(100, round(($goal->current_value / $goal->target_value) * 100));
-    }
-
-    public function addNutrition(Request $request)
-    {
-        $validated = $request->validate([
-            'calories' => 'required|integer|min:0|max:10000',
-            'protein_grams' => 'nullable|numeric|min:0|max:500',
-            'carbs_grams' => 'nullable|numeric|min:0|max:500',
-            'fat_grams' => 'nullable|numeric|min:0|max:200',
-        ]);
-
-        $nutrition = NutritionLog::firstOrCreate(['user_id' => Auth::id(), 'date' => today()]);
-        $nutrition->update([
-            'calories' => ($nutrition->calories ?? 0) + $validated['calories'],
-            'protein_grams' => ($nutrition->protein_grams ?? 0) + ($validated['protein_grams'] ?? 0),
-            'carbs_grams' => ($nutrition->carbs_grams ?? 0) + ($validated['carbs_grams'] ?? 0),
-            'fat_grams' => ($nutrition->fat_grams ?? 0) + ($validated['fat_grams'] ?? 0),
-        ]);
-
-        // Send notification for meal milestone
-        if ($nutrition->calories >= 2000 && $nutrition->calories - $validated['calories'] < 2000) {
-            $this->notificationService->sendToUser(Auth::user(), [
-                'type' => 'nutrition_milestone',
-                'title' => '🍽️ Nutrition Milestone',
-                'message' => 'You\'ve reached 2000+ calories today! Keep fueling your fitness journey.',
-                'priority' => 'low',
-                'action_url' => route('member.nutrition'),
-                'data' => ['calories' => $nutrition->calories]
-            ]);
-        }
-
-        return response()->json(['success' => true, 'nutrition' => $nutrition]);
-    }
-
-    public function sendMessage(Request $request)
-    {
-        $validated = $request->validate([
-            'receiver_id' => 'required|exists:users,id',
-            'message' => 'required|string|max:1000'
-        ]);
-
-        $message = Message::create([
-            'sender_id' => Auth::id(),
-            'receiver_id' => $validated['receiver_id'],
-            'message' => $validated['message'],
-            'read' => false,
-        ]);
-
-        // Dispatch event for real-time notification
-        event(new NewMessageSent($message, Auth::user(), User::find($validated['receiver_id'])));
-
-        // Send notification to receiver
-        $this->notificationService->newMessage(
-            User::find($validated['receiver_id']),
-            Auth::user(),
-            $validated['message']
-        );
-
-        return response()->json(['success' => true, 'message' => $message]);
-    }
-
-    public function deleteMessage(Message $message)
-    {
-        if ($message->sender_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $message->delete();
-
-        if (request()->ajax() || request()->wantsJson()) {
-            return response()->json(['success' => true]);
-        }
-
-        return redirect()->back()->with('success', 'Message deleted successfully');
-    }
-
-    public function updateMessage(Request $request, Message $message)
-    {
-        if ($message->sender_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $validated = $request->validate([
-            'message' => 'required|string|max:1000'
-        ]);
-
-        $message->update([
-            'message' => $validated['message'],
-            'edited_at' => now(),
-            'is_edited' => true
-        ]);
-
-        if (request()->ajax() || request()->wantsJson()) {
-            return response()->json(['success' => true, 'message' => $message]);
-        }
-
-        return redirect()->back()->with('success', 'Message updated successfully');
-    }
-
-    public function pinMessage(Message $message)
-    {
-        if ($message->receiver_id !== Auth::id() && $message->sender_id !== Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $isPinning = !$message->is_pinned;
-
-        $message->update([
-            'is_pinned' => $isPinning,
-            'pinned_at' => $isPinning ? now() : null
-        ]);
-
-        if (request()->ajax() || request()->wantsJson()) {
-            return response()->json(['success' => true, 'is_pinned' => $message->is_pinned]);
-        }
-
-        return redirect()->back()->with('success', $isPinning ? 'Message pinned' : 'Message unpinned');
-    }
-
-    public function getMessages($userId)
-    {
-        $messages = Message::where(function($query) use ($userId) {
-                $query->where('sender_id', Auth::id())
-                      ->where('receiver_id', $userId);
-            })->orWhere(function($query) use ($userId) {
-                $query->where('sender_id', $userId)
-                      ->where('receiver_id', Auth::id());
-            })
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        // Mark messages as read
-        Message::where('receiver_id', Auth::id())
-            ->where('sender_id', $userId)
-            ->where('read', false)
-            ->update(['read' => true, 'read_at' => now()]);
-
-        return response()->json(['success' => true, 'messages' => $messages]);
-    }
-
-    public function selectTrainer(Request $request)
-    {
-        $validated = $request->validate(['trainer_id' => 'required|exists:users,id']);
-        $trainer = User::find($validated['trainer_id']);
-
-        if ($trainer->role !== 'instructor') {
-            return response()->json(['error' => 'Invalid trainer selected'], 400);
-        }
-
-        $user = Auth::user();
-        $user->instructor_id = $trainer->id;
-        $user->save();
-
-        // Send welcome message from trainer
-        Message::create([
-            'sender_id' => $trainer->id,
-            'receiver_id' => $user->id,
-            'message' => "Hello {$user->name}! I'm your new personal trainer. I'm excited to help you achieve your fitness goals! 💪",
-            'read' => false,
-        ]);
-
-        // Send notification to member
-        $this->notificationService->instructorAssigned($user, $trainer);
 
         return response()->json(['success' => true]);
     }
@@ -673,6 +394,471 @@ class MemberDashboardController extends Controller
         }
         return response()->json(['success' => true, 'templates' => $templates]);
     }
+
+    // ==================== ATTENDANCE METHODS ====================
+
+    public function checkIn()
+    {
+        $user = Auth::user();
+        $existing = Attendance::where('user_id', $user->id)->whereDate('check_in', today())->whereNull('check_out')->first();
+        if ($existing) {
+            return response()->json(['error' => 'You are already checked in'], 400);
+        }
+
+        $attendance = Attendance::create(['user_id' => $user->id, 'check_in' => now(), 'status' => 'checked_in']);
+
+        $streakCount = $this->calculateCurrentStreak();
+
+        event(new MemberCheckedIn($user, $streakCount));
+        $this->notificationService->checkInConfirmation($user, $streakCount);
+
+        return response()->json(['success' => true, 'message' => 'Checked in successfully']);
+    }
+
+    // ==================== PROGRESS METHODS ====================
+
+    public function addProgress(Request $request)
+    {
+        $validated = $request->validate([
+            'weight_kg' => 'required|numeric|min:20|max:300',
+            'date' => 'required|date'
+        ]);
+
+        $progress = ProgressLog::updateOrCreate(
+            ['user_id' => Auth::id(), 'date' => $validated['date']],
+            ['weight_kg' => $validated['weight_kg']]
+        );
+
+        $this->notificationService->sendToUser(Auth::user(), [
+            'type' => 'weight_logged',
+            'title' => '⚖️ Weight Logged',
+            'message' => 'Your weight of ' . $validated['weight_kg'] . ' kg has been recorded for ' . Carbon::parse($validated['date'])->format('M d, Y'),
+            'priority' => 'low',
+            'action_url' => route('member.dashboard'),
+            'data' => ['weight' => $validated['weight_kg'], 'date' => $validated['date']]
+        ]);
+
+        return response()->json(['success' => true, 'progress' => $progress]);
+    }
+
+    // ==================== GOAL METHODS ====================
+
+    public function createGoal(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'type' => 'required|string|in:weight_loss,muscle_gain,endurance,strength,workouts,attendance,nutrition',
+            'target_value' => 'required|numeric|min:1',
+            'unit' => 'nullable|string|max:50',
+            'target_date' => 'required|date|after:today'
+        ]);
+
+        $goal = Goal::create([
+            'user_id' => Auth::id(),
+            'title' => $validated['title'],
+            'type' => $validated['type'],
+            'target_value' => $validated['target_value'],
+            'current_value' => 0,
+            'unit' => $validated['unit'] ?? 'units',
+            'target_date' => $validated['target_date'],
+            'status' => 'active'
+        ]);
+
+        $this->notificationService->sendToUser(Auth::user(), [
+            'type' => 'goal_created',
+            'title' => '🎯 New Goal Created',
+            'message' => 'Your goal "' . $goal->title . '" has been created. Target: ' . $goal->target_value . ' ' . $goal->unit,
+            'priority' => 'medium',
+            'action_url' => route('member.dashboard'),
+            'data' => ['goal_id' => $goal->id]
+        ]);
+
+        return response()->json(['success' => true, 'goal' => $goal]);
+    }
+
+    public function getGoals()
+    {
+        $goals = Goal::where('user_id', Auth::id())->where('status', 'active')->get();
+        return response()->json(['success' => true, 'goals' => $goals]);
+    }
+
+    private function checkGoalProgress($user)
+    {
+        $goals = Goal::where('user_id', $user->id)->where('status', 'active')->get();
+
+        foreach ($goals as $goal) {
+            $percentage = $this->calculateGoalPercentage($goal);
+            $milestones = [25, 50, 75];
+
+            if (in_array($percentage, $milestones) && !$goal->last_notified_at?->isToday()) {
+                $this->notificationService->sendToUser($user, [
+                    'type' => 'goal_progress',
+                    'title' => '🎯 Goal Progress Update',
+                    'message' => "You're {$percentage}% of the way to your goal: {$goal->title}",
+                    'priority' => 'medium',
+                    'action_url' => route('member.dashboard'),
+                    'data' => ['goal_id' => $goal->id, 'percentage' => $percentage]
+                ]);
+
+                $goal->update(['last_notified_at' => now()]);
+            }
+
+            if ($goal->current_value >= $goal->target_value && $goal->status === 'active') {
+                $goal->update(['status' => 'completed', 'completed_at' => now()]);
+                event(new GoalAchieved($user, $goal));
+                $this->notificationService->goalAchieved($user, $goal);
+            }
+        }
+    }
+
+    private function calculateGoalPercentage($goal)
+    {
+        if ($goal->target_value <= 0) return 0;
+        return min(100, round(($goal->current_value / $goal->target_value) * 100));
+    }
+
+    // ==================== NUTRITION METHODS ====================
+
+    public function addNutrition(Request $request)
+    {
+        $validated = $request->validate([
+            'calories' => 'required|integer|min:0|max:10000',
+            'protein_grams' => 'nullable|numeric|min:0|max:500',
+            'carbs_grams' => 'nullable|numeric|min:0|max:500',
+            'fat_grams' => 'nullable|numeric|min:0|max:200',
+        ]);
+
+        $nutrition = NutritionLog::firstOrCreate(['user_id' => Auth::id(), 'date' => today()]);
+        $nutrition->update([
+            'calories' => ($nutrition->calories ?? 0) + $validated['calories'],
+            'protein_grams' => ($nutrition->protein_grams ?? 0) + ($validated['protein_grams'] ?? 0),
+            'carbs_grams' => ($nutrition->carbs_grams ?? 0) + ($validated['carbs_grams'] ?? 0),
+            'fat_grams' => ($nutrition->fat_grams ?? 0) + ($validated['fat_grams'] ?? 0),
+        ]);
+
+        if ($nutrition->calories >= 2000 && $nutrition->calories - $validated['calories'] < 2000) {
+            $this->notificationService->sendToUser(Auth::user(), [
+                'type' => 'nutrition_milestone',
+                'title' => '🍽️ Nutrition Milestone',
+                'message' => 'You\'ve reached 2000+ calories today! Keep fueling your fitness journey.',
+                'priority' => 'low',
+                'action_url' => route('member.dashboard'),
+                'data' => ['calories' => $nutrition->calories]
+            ]);
+        }
+
+        return response()->json(['success' => true, 'nutrition' => $nutrition]);
+    }
+
+    public function getTodayNutrition()
+    {
+        $nutrition = NutritionLog::where('user_id', Auth::id())->whereDate('date', today())->first();
+        if (!$nutrition) {
+            $nutrition = new NutritionLog(['user_id' => Auth::id(), 'date' => today(), 'calories' => 0, 'protein_grams' => 0, 'carbs_grams' => 0, 'fat_grams' => 0]);
+        }
+        return response()->json(['success' => true, 'nutrition' => $nutrition]);
+    }
+
+    // ==================== MESSAGE METHODS (FULLY FUNCTIONAL) ====================
+
+    /**
+     * Get conversation between member and trainer
+     */
+    public function getConversation($trainerId)
+    {
+        try {
+            $userId = Auth::id();
+
+            // Verify the trainer exists
+            $trainer = User::find($trainerId);
+            if (!$trainer || $trainer->role !== 'instructor') {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid trainer'
+                ], 404);
+            }
+
+            // Get messages between the two users
+            $messages = Message::where(function($query) use ($userId, $trainerId) {
+                $query->where('sender_id', $userId)->where('receiver_id', $trainerId);
+            })->orWhere(function($query) use ($userId, $trainerId) {
+                $query->where('sender_id', $trainerId)->where('receiver_id', $userId);
+            })
+            ->where(function($query) use ($userId) {
+                // Don't show messages deleted by current user
+                $query->where(function($q) use ($userId) {
+                    $q->where('is_deleted_by_sender', 0)->orWhere('sender_id', '!=', $userId);
+                })->where(function($q) use ($userId) {
+                    $q->where('is_deleted_by_receiver', 0)->orWhere('receiver_id', '!=', $userId);
+                });
+            })
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+            // Mark unread messages as read
+            Message::where('receiver_id', $userId)
+                ->where('sender_id', $trainerId)
+                ->where('read', 0)
+                ->update([
+                    'read' => 1,
+                    'read_at' => Carbon::now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'messages' => $messages
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error loading conversation: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send a message to trainer
+     */
+    public function sendMessageToTrainer(Request $request)
+    {
+        try {
+            $request->validate([
+                'receiver_id' => 'required|exists:users,id',
+                'message' => 'required|string|max:1000'
+            ]);
+
+            $receiver = User::find($request->receiver_id);
+
+            $message = Message::create([
+                'sender_id' => Auth::id(),
+                'receiver_id' => $request->receiver_id,
+                'message' => $request->message,
+                'read' => 0,
+                'is_edited' => 0,
+                'is_pinned' => 0,
+                'is_deleted_by_sender' => 0,
+                'is_deleted_by_receiver' => 0
+            ]);
+
+            // Dispatch event for real-time notification
+            if ($receiver) {
+                event(new NewMessageSent($message, Auth::user(), $receiver));
+
+                // Send notification to receiver
+                $this->notificationService->newMessage(
+                    $receiver,
+                    Auth::user(),
+                    $request->message
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error sending message: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a message (edit)
+     */
+    public function updateMessage(Request $request, $messageId)
+    {
+        try {
+            $request->validate([
+                'message' => 'required|string|max:1000'
+            ]);
+
+            $message = Message::where('id', $messageId)
+                ->where('sender_id', Auth::id())
+                ->first();
+
+            if (!$message) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Message not found'
+                ], 404);
+            }
+
+            $message->update([
+                'message' => $request->message,
+                'is_edited' => 1,
+                'edited_at' => Carbon::now()
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error updating message: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a message (soft delete)
+     */
+    public function deleteMessage($messageId)
+    {
+        try {
+            $message = Message::find($messageId);
+
+            if (!$message) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Message not found'
+                ], 404);
+            }
+
+            $userId = Auth::id();
+
+            if ($message->sender_id == $userId) {
+                $message->update(['is_deleted_by_sender' => 1]);
+            } elseif ($message->receiver_id == $userId) {
+                $message->update(['is_deleted_by_receiver' => 1]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Unauthorized'
+                ], 403);
+            }
+
+            // Permanently delete if both users deleted it
+            if ($message->is_deleted_by_sender && $message->is_deleted_by_receiver) {
+                $message->forceDelete();
+            }
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error deleting message: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Pin or unpin a message
+     */
+    public function pinMessage($messageId)
+    {
+        try {
+            $message = Message::where('id', $messageId)
+                ->where('sender_id', Auth::id())
+                ->first();
+
+            if (!$message) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Message not found'
+                ], 404);
+            }
+
+            $newPinStatus = !$message->is_pinned;
+
+            $message->update([
+                'is_pinned' => $newPinStatus,
+                'pinned_at' => $newPinStatus ? Carbon::now() : null
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'is_pinned' => $newPinStatus
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error pinning message: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get messages with a specific user (legacy method)
+     */
+    public function getMessages($userId)
+    {
+        try {
+            $messages = Message::where(function($query) use ($userId) {
+                    $query->where('sender_id', Auth::id())
+                          ->where('receiver_id', $userId);
+                })->orWhere(function($query) use ($userId) {
+                    $query->where('sender_id', $userId)
+                          ->where('receiver_id', Auth::id());
+                })
+                ->where(function($query) {
+                    $query->where(function($q) {
+                        $q->where('is_deleted_by_sender', 0)->orWhere('sender_id', '!=', Auth::id());
+                    })->where(function($q) {
+                        $q->where('is_deleted_by_receiver', 0)->orWhere('receiver_id', '!=', Auth::id());
+                    });
+                })
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            // Mark messages as read
+            Message::where('receiver_id', Auth::id())
+                ->where('sender_id', $userId)
+                ->where('read', false)
+                ->update(['read' => true, 'read_at' => now()]);
+
+            return response()->json(['success' => true, 'messages' => $messages]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get chat messages for a specific trainer (AJAX endpoint)
+     */
+    public function getChatMessages($trainerId)
+    {
+        return $this->getConversation($trainerId);
+    }
+
+    // ==================== TRAINER METHODS ====================
+
+    public function selectTrainer(Request $request)
+    {
+        $validated = $request->validate(['trainer_id' => 'required|exists:users,id']);
+        $trainer = User::find($validated['trainer_id']);
+
+        if ($trainer->role !== 'instructor') {
+            return response()->json(['error' => 'Invalid trainer selected'], 400);
+        }
+
+        $user = Auth::user();
+        $user->instructor_id = $trainer->id;
+        $user->save();
+
+        // Send welcome message from trainer
+        Message::create([
+            'sender_id' => $trainer->id,
+            'receiver_id' => $user->id,
+            'message' => "Hello {$user->name}! I'm your new personal trainer. I'm excited to help you achieve your fitness goals! 💪",
+            'read' => 0,
+            'is_edited' => 0,
+            'is_pinned' => 0,
+            'is_deleted_by_sender' => 0,
+            'is_deleted_by_receiver' => 0
+        ]);
+
+        $this->notificationService->instructorAssigned($user, $trainer);
+
+        return response()->json(['success' => true]);
+    }
+
+    // ==================== AI CHAT METHODS ====================
 
     public function aiChat(Request $request)
     {

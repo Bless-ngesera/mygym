@@ -441,7 +441,56 @@
     // DOM Elements
     let messagesContainer, chatInput, sendButton, charCountSpan, suggestionsContainer;
 
-    // Initialize DOM elements after page load
+    // ==================== OPEN/CLOSE FUNCTIONS (MUST BE FIRST) ====================
+
+    window.openChat = function() {
+        console.log('openChat called');
+        const sidebar = document.getElementById('aiChatSidebar');
+        const overlay = document.getElementById('chatOverlay');
+        if (sidebar && overlay) {
+            sidebar.classList.remove('hidden');
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                sidebar.classList.remove('translate-x-full');
+                overlay.classList.remove('opacity-0');
+                overlay.classList.add('opacity-100');
+            }, 10);
+
+            // Initialize elements and load data
+            initElements();
+            loadCurrentSession();
+            loadSuggestions();
+
+            setTimeout(() => {
+                if (chatInput) chatInput.focus();
+            }, 300);
+        }
+    };
+
+    window.closeChat = function() {
+        const sidebar = document.getElementById('aiChatSidebar');
+        const overlay = document.getElementById('chatOverlay');
+        if (sidebar && overlay) {
+            sidebar.classList.add('translate-x-full');
+            overlay.classList.remove('opacity-100');
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                sidebar.classList.add('hidden');
+                overlay.classList.add('hidden');
+            }, 300);
+        }
+    };
+
+    // ==================== EVENT LISTENERS ====================
+
+    // Listen for the custom event from the navigation button
+    window.addEventListener('open-chat', function(e) {
+        console.log('open-chat event received', e);
+        window.openChat();
+    });
+
+    // ==================== INITIALIZATION ====================
+
     function initElements() {
         messagesContainer = document.getElementById('chatMessages');
         chatInput = document.getElementById('chatInput');
@@ -450,7 +499,6 @@
         suggestionsContainer = document.getElementById('quickSuggestions');
     }
 
-    // Auto-resize textarea
     function initTextarea() {
         if (!chatInput) return;
 
@@ -476,7 +524,8 @@
         });
     }
 
-    // Beautiful Toast Notification System
+    // ==================== TOAST NOTIFICATION ====================
+
     function showToast(message, type = 'success') {
         const existingToast = document.querySelector('.custom-toast');
         if (existingToast) existingToast.remove();
@@ -505,7 +554,8 @@
         }, 3500);
     }
 
-    // Toggle suggestions visibility
+    // ==================== SUGGESTIONS ====================
+
     window.toggleSuggestions = function() {
         suggestionsVisible = !suggestionsVisible;
         const suggestionsDiv = document.getElementById('quickSuggestions');
@@ -529,512 +579,14 @@
         }
     };
 
-    // Auto-hide suggestions helper
     function autoHideSuggestions() {
-        if (suggestionsVisible) {
-            toggleSuggestions();
-        }
+        if (suggestionsVisible) toggleSuggestions();
     }
 
-    // Show suggestions helper
     function showSuggestions() {
-        if (!suggestionsVisible) {
-            toggleSuggestions();
-        }
+        if (!suggestionsVisible) toggleSuggestions();
     }
 
-    // Open history modal
-    window.toggleChatHistory = async function() {
-        const modal = document.getElementById('chatHistoryModal');
-
-        if (modal.classList.contains('hidden')) {
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('scale-95', 'opacity-0');
-                modal.classList.add('scale-100', 'opacity-100');
-            }, 10);
-            await loadChatHistoryList();
-        } else {
-            closeHistoryModal();
-        }
-    };
-
-    function closeHistoryModal() {
-        const modal = document.getElementById('chatHistoryModal');
-        modal.classList.remove('scale-100', 'opacity-100');
-        modal.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
-    }
-
-    // Pin/Unpin session
-    window.togglePinSession = function(sessionId, event) {
-        event.stopPropagation();
-
-        if (pinnedSessions.includes(sessionId)) {
-            pinnedSessions = pinnedSessions.filter(id => id !== sessionId);
-            showToast('Chat unpinned', 'info');
-        } else {
-            pinnedSessions.push(sessionId);
-            showToast('Chat pinned', 'success');
-        }
-
-        localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
-        loadChatHistoryList();
-    };
-
-    // Open rename modal
-    window.openRenameModal = function(sessionId, currentTitle, event) {
-        event.stopPropagation();
-        pendingRenameSessionId = sessionId;
-        const input = document.getElementById('renameChatInput');
-        input.value = currentTitle;
-
-        const modal = document.getElementById('renameChatModal');
-        const content = document.getElementById('renameModalContent');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => {
-            content.classList.remove('scale-95', 'opacity-0');
-            content.classList.add('scale-100', 'opacity-100');
-            input.focus();
-            input.select();
-        }, 10);
-    };
-
-    function closeRenameModal() {
-        const modal = document.getElementById('renameChatModal');
-        const content = document.getElementById('renameModalContent');
-        content.classList.remove('scale-100', 'opacity-100');
-        content.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            pendingRenameSessionId = null;
-        }, 300);
-    }
-
-    window.confirmRenameSession = async function() {
-        const newTitle = document.getElementById('renameChatInput').value.trim();
-        if (!newTitle) {
-            showToast('Please enter a title', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/chat/sessions/${pendingRenameSessionId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ title: newTitle })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('Chat renamed successfully', 'success');
-                closeRenameModal();
-                await loadChatHistoryList();
-                if (currentSessionId == pendingRenameSessionId) {
-                    // Update current session title in header if needed
-                }
-            } else {
-                showToast(data.message || 'Failed to rename', 'error');
-            }
-        } catch (error) {
-            console.error('Error renaming session:', error);
-            showToast('Failed to rename chat', 'error');
-        }
-    };
-
-    // Open share modal
-    window.openShareModal = function(sessionId, event) {
-        event.stopPropagation();
-        pendingShareSessionId = sessionId;
-        const shareLink = `${window.location.origin}/chat/share/${sessionId}`;
-        document.getElementById('shareChatLink').textContent = shareLink;
-
-        const modal = document.getElementById('shareChatModal');
-        const content = document.getElementById('shareModalContent');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => {
-            content.classList.remove('scale-95', 'opacity-0');
-            content.classList.add('scale-100', 'opacity-100');
-        }, 10);
-    };
-
-    function closeShareModal() {
-        const modal = document.getElementById('shareChatModal');
-        const content = document.getElementById('shareModalContent');
-        content.classList.remove('scale-100', 'opacity-100');
-        content.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            pendingShareSessionId = null;
-        }, 300);
-    }
-
-    window.copyShareLink = function() {
-        const link = document.getElementById('shareChatLink').textContent;
-        navigator.clipboard.writeText(link);
-        showToast('Link copied to clipboard!', 'success');
-        closeShareModal();
-    };
-
-    // Open delete confirmation modal
-    window.openDeleteModal = function(sessionId, sessionTitle, event) {
-        event.stopPropagation();
-        pendingDeleteSessionId = sessionId;
-        const messageEl = document.getElementById('deleteModalMessage');
-        messageEl.innerHTML = `"<strong>${escapeHtml(sessionTitle)}</strong>" can't be recovered. Share links from it will be disabled.`;
-
-        const modal = document.getElementById('deleteConfirmationModal');
-        const content = document.getElementById('deleteModalContent');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => {
-            content.classList.remove('scale-95', 'opacity-0');
-            content.classList.add('scale-100', 'opacity-100');
-        }, 10);
-    };
-
-    function closeDeleteModal() {
-        const modal = document.getElementById('deleteConfirmationModal');
-        const content = document.getElementById('deleteModalContent');
-        content.classList.remove('scale-100', 'opacity-100');
-        content.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            pendingDeleteSessionId = null;
-        }, 300);
-    }
-
-    window.confirmDeleteSession = async function() {
-        if (!pendingDeleteSessionId) return;
-
-        try {
-            const response = await fetch(`/chat/sessions/${pendingDeleteSessionId}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Accept': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-            closeDeleteModal();
-
-            if (data.success) {
-                showToast(data.message, 'success');
-                await loadChatHistoryList();
-
-                if (currentSessionId == pendingDeleteSessionId) {
-                    await startNewChat();
-                }
-
-                // Remove from pinned if needed
-                if (pinnedSessions.includes(pendingDeleteSessionId)) {
-                    pinnedSessions = pinnedSessions.filter(id => id !== pendingDeleteSessionId);
-                    localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
-                }
-            } else {
-                showToast(data.message || 'Failed to delete conversation', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting session:', error);
-            showToast('Failed to delete conversation', 'error');
-        } finally {
-            pendingDeleteSessionId = null;
-        }
-    };
-
-    // Load chat sessions list with pin support
-    async function loadChatHistoryList() {
-        const container = document.getElementById('chatHistoryList');
-        if (!container) return;
-
-        container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Loading sessions...</div>';
-
-        try {
-            const response = await fetch('/chat/sessions', {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Accept': 'application/json'
-                }
-            });
-            const data = await response.json();
-
-            if (data.success && data.sessions && data.sessions.length > 0) {
-                let sessions = data.sessions;
-
-                // Sort: pinned first, then by updated_at
-                sessions.sort((a, b) => {
-                    const aPinned = pinnedSessions.includes(a.id);
-                    const bPinned = pinnedSessions.includes(b.id);
-                    if (aPinned && !bPinned) return -1;
-                    if (!aPinned && bPinned) return 1;
-                    return new Date(b.updated_at) - new Date(a.updated_at);
-                });
-
-                container.innerHTML = sessions.map(session => {
-                    const isPinned = pinnedSessions.includes(session.id);
-                    return `
-                        <div class="history-item p-3 rounded-xl cursor-pointer bg-gray-800/30 hover:bg-gray-800/50 transition-all relative" onclick="loadChatSession('${session.id}')">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1 min-w-0 pr-2">
-                                    <div class="flex items-center gap-2">
-                                        ${isPinned ? '<svg class="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.5v6l.5.5.5-.5v-6H18v-2l-2-2z"/></svg>' : ''}
-                                        <p class="text-sm text-white font-medium truncate">${escapeHtml(session.title || 'Conversation')}</p>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mt-1">${new Date(session.updated_at).toLocaleDateString()} • ${session.message_count || 0} messages</p>
-                                    <p class="text-xs text-gray-400 truncate mt-1">${escapeHtml(session.preview || 'No messages')}</p>
-                                </div>
-                                <div class="history-actions">
-                                    <button onclick="event.stopPropagation(); togglePinSession('${session.id}', event)" class="history-action-btn text-gray-400 hover:text-yellow-400" title="${isPinned ? 'Unpin' : 'Pin'}">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
-                                        </svg>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); openRenameModal('${session.id}', '${escapeHtml(session.title || 'Conversation')}', event)" class="history-action-btn text-gray-400 hover:text-blue-400" title="Rename">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                        </svg>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); openShareModal('${session.id}', event)" class="history-action-btn text-gray-400 hover:text-green-400" title="Share">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
-                                        </svg>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); openDeleteModal('${session.id}', '${escapeHtml(session.title || 'Conversation')}', event)" class="history-action-btn text-gray-400 hover:text-red-400" title="Delete">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">No conversations yet.<br>Start a new chat!</div>';
-            }
-        } catch (error) {
-            console.error('Error loading sessions:', error);
-            container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Failed to load sessions</div>';
-            showToast('Failed to load chat history', 'error');
-        }
-    }
-
-    // Load specific chat session
-    window.loadChatSession = async function(sessionId) {
-        try {
-            const response = await fetch(`/chat/sessions/${sessionId}`, {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Accept': 'application/json'
-                }
-            });
-            const data = await response.json();
-
-            if (data.success && messagesContainer) {
-                currentSessionId = sessionId;
-                messagesContainer.innerHTML = '';
-                messageCount = 0;
-
-                if (data.messages && data.messages.length > 0) {
-                    data.messages.forEach(msg => {
-                        addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
-                        messageCount++;
-                    });
-                    updateMessageCount();
-                } else {
-                    addWelcomeMessage();
-                }
-
-                scrollToBottom();
-                closeHistoryModal();
-                showToast('Conversation loaded successfully', 'success');
-
-                if (messageCount > 0 && suggestionsVisible) {
-                    autoHideSuggestions();
-                }
-            } else {
-                showToast(data.message || 'Failed to load conversation', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading session:', error);
-            showToast('Failed to load conversation', 'error');
-        }
-    };
-
-    // Start new chat
-    window.startNewChat = async function() {
-        try {
-            const response = await fetch('/chat/sessions', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.success && data.session) {
-                currentSessionId = data.session.id;
-                messagesContainer.innerHTML = '';
-                messageCount = 0;
-                addWelcomeMessage();
-                updateMessageCount();
-                showToast('New conversation started', 'success');
-
-                if (!suggestionsVisible) {
-                    showSuggestions();
-                }
-
-                await loadChatHistoryList();
-                if (chatInput) chatInput.focus();
-            } else {
-                currentSessionId = null;
-                messagesContainer.innerHTML = '';
-                messageCount = 0;
-                addWelcomeMessage();
-                updateMessageCount();
-                showToast('New conversation started', 'success');
-
-                if (!suggestionsVisible) {
-                    showSuggestions();
-                }
-
-                if (chatInput) chatInput.focus();
-            }
-        } catch (error) {
-            console.error('Error creating new session:', error);
-            currentSessionId = null;
-            messagesContainer.innerHTML = '';
-            messageCount = 0;
-            addWelcomeMessage();
-            updateMessageCount();
-            showToast('New conversation started', 'info');
-
-            if (!suggestionsVisible) {
-                showSuggestions();
-            }
-
-            if (chatInput) chatInput.focus();
-        }
-    };
-
-    function addWelcomeMessage() {
-        if (!messagesContainer) return;
-
-        messagesContainer.innerHTML = `
-            <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
-                <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
-                    <div class="flex items-center gap-2 mb-2">
-                        <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                        </div>
-                        <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
-                        <span class="text-xs text-gray-500">Online</span>
-                    </div>
-                    <p class="text-sm text-gray-200 leading-relaxed">✨ New conversation! How can I help you today?</p>
-                    <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    // Clear all history with beautiful confirmation and toast
-    window.clearAllHistory = async function() {
-        if (confirm('⚠️ WARNING: This will delete ALL conversations permanently. This action cannot be undone. Are you sure?')) {
-            try {
-                const response = await fetch('/chat/clear-all', {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                        'Accept': 'application/json'
-                    }
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    showToast(data.message, 'success');
-                    pinnedSessions = [];
-                    localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
-                    await startNewChat();
-                    await loadChatHistoryList();
-                    closeHistoryModal();
-                } else {
-                    showToast(data.message || 'Failed to clear history', 'error');
-                }
-            } catch (error) {
-                console.error('Error clearing history:', error);
-                showToast('Failed to clear history', 'error');
-            }
-        }
-    };
-
-    // Load current session messages
-    async function loadCurrentSession() {
-        try {
-            const response = await fetch('/chat/sessions/current', {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
-                    'Accept': 'application/json'
-                }
-            });
-            const data = await response.json();
-
-            if (data.success && data.messages && data.messages.length > 0 && messagesContainer) {
-                const welcomeMsg = document.getElementById('welcomeMessage');
-                if (welcomeMsg) welcomeMsg.remove();
-
-                messageCount = data.messages.length;
-                updateMessageCount();
-
-                data.messages.forEach(msg => {
-                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
-                });
-                scrollToBottom();
-
-                if (data.session_id) {
-                    currentSessionId = data.session_id;
-                }
-
-                if (messageCount > 0 && suggestionsVisible) {
-                    autoHideSuggestions();
-                }
-            } else if (data.success && (!data.messages || data.messages.length === 0)) {
-                addWelcomeMessage();
-                if (!suggestionsVisible) {
-                    showSuggestions();
-                }
-            }
-        } catch (error) {
-            console.error('Error loading current session:', error);
-            addWelcomeMessage();
-        }
-    }
-
-    function updateMessageCount() {
-        const countElement = document.getElementById('messageCount');
-        if (countElement) {
-            countElement.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''}`;
-        }
-    }
-
-    // Load quick suggestions
     async function loadSuggestions() {
         if (!suggestionsContainer) return;
 
@@ -1104,99 +656,68 @@
         }
     };
 
-    // Send message to AI
-    window.sendMessage = async function() {
-        if (isProcessing) return;
-        if (!chatInput) return;
+    // ==================== CHAT MESSAGES ====================
 
-        const message = chatInput.value.trim();
-        if (!message) {
-            chatInput.classList.add('border-red-500');
-            setTimeout(() => chatInput.classList.remove('border-red-500'), 500);
-            return;
-        }
-
-        if (message.length > 2000) {
-            showToast('Message is too long! Maximum 2000 characters.', 'error');
-            return;
-        }
-
-        if (suggestionsVisible) {
-            autoHideSuggestions();
-        }
-
-        const welcomeMsg = document.getElementById('welcomeMessage');
-        if (welcomeMsg) welcomeMsg.remove();
-
-        addMessageToChat(message, 'user');
-        chatInput.value = '';
-        chatInput.style.height = 'auto';
-        if (charCountSpan) charCountSpan.textContent = '0';
-        messageCount++;
-        updateMessageCount();
-
-        isProcessing = true;
-        if (sendButton) sendButton.disabled = true;
-        showTypingIndicator();
-
+    async function loadCurrentSession() {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const response = await fetch('/chat/send', {
-                method: 'POST',
+            const response = await fetch('/chat/sessions/current', {
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                     'Accept': 'application/json'
-                },
-                body: JSON.stringify({ message: message, session_id: currentSessionId })
+                }
             });
-
             const data = await response.json();
-            hideTypingIndicator();
 
-            if (data.success) {
-                if (!currentSessionId) currentSessionId = data.session_id;
-                await streamMessageToChat(data.message, 'ai');
-                messageCount++;
+            if (data.success && data.messages && data.messages.length > 0 && messagesContainer) {
+                const welcomeMsg = document.getElementById('welcomeMessage');
+                if (welcomeMsg) welcomeMsg.remove();
+
+                messageCount = data.messages.length;
                 updateMessageCount();
-                await loadChatHistoryList();
-            } else {
-                addMessageToChat(data.message || 'Sorry, I encountered an error. Please try again.', 'ai');
-                messageCount++;
-                updateMessageCount();
-                showToast(data.message || 'Failed to get response', 'error');
+
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
+                });
+                scrollToBottom();
+
+                if (data.session_id) currentSessionId = data.session_id;
+                if (messageCount > 0 && suggestionsVisible) autoHideSuggestions();
+            } else if (data.success && (!data.messages || data.messages.length === 0)) {
+                addWelcomeMessage();
+                if (!suggestionsVisible) showSuggestions();
             }
         } catch (error) {
-            console.error('Fetch error:', error);
-            hideTypingIndicator();
-            addMessageToChat('Network error. Please check your connection and try again.', 'ai');
-            messageCount++;
-            updateMessageCount();
-            showToast('Network error. Please try again.', 'error');
-        } finally {
-            isProcessing = false;
-            if (sendButton) sendButton.disabled = false;
-            if (chatInput) chatInput.focus();
+            console.error('Error loading current session:', error);
+            addWelcomeMessage();
         }
-    };
+    }
 
-    // Streaming effect for messages
-    async function streamMessageToChat(fullMessage, type) {
-        const messageDiv = createMessageContainer(type, '');
-        const contentDiv = messageDiv.querySelector('.message-content');
+    function addWelcomeMessage() {
         if (!messagesContainer) return;
-        messagesContainer.appendChild(messageDiv);
-        scrollToBottom();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const words = fullMessage.split(/(\s+)/);
-        let displayedText = '';
-        for (let i = 0; i < words.length; i++) {
-            displayedText += words[i];
-            if (contentDiv) contentDiv.innerHTML = formatMessage(escapeHtml(displayedText));
-            await new Promise(resolve => setTimeout(resolve, 8));
-            scrollToBottom();
+        messagesContainer.innerHTML = `
+            <div class="flex justify-start animate-fade-in welcome-message" id="welcomeMessage">
+                <div class="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-sm border border-purple-500/30 rounded-2xl rounded-tl-none px-5 py-4 max-w-[90%] shadow-xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-semibold text-purple-400">MyGym AI</span>
+                        <span class="text-xs text-gray-500">Online</span>
+                    </div>
+                    <p class="text-sm text-gray-200 leading-relaxed">✨ New conversation! How can I help you today?</p>
+                    <span class="text-xs text-gray-500 mt-2 block">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    function updateMessageCount() {
+        const countElement = document.getElementById('messageCount');
+        if (countElement) {
+            countElement.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''}`;
         }
-        addCopyButton(messageDiv, fullMessage);
     }
 
     function createMessageContainer(type, content) {
@@ -1295,6 +816,97 @@
         }
     };
 
+    window.sendMessage = async function() {
+        if (isProcessing) return;
+        if (!chatInput) return;
+
+        const message = chatInput.value.trim();
+        if (!message) {
+            chatInput.classList.add('border-red-500');
+            setTimeout(() => chatInput.classList.remove('border-red-500'), 500);
+            return;
+        }
+
+        if (message.length > 2000) {
+            showToast('Message is too long! Maximum 2000 characters.', 'error');
+            return;
+        }
+
+        if (suggestionsVisible) autoHideSuggestions();
+
+        const welcomeMsg = document.getElementById('welcomeMessage');
+        if (welcomeMsg) welcomeMsg.remove();
+
+        addMessageToChat(message, 'user');
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        if (charCountSpan) charCountSpan.textContent = '0';
+        messageCount++;
+        updateMessageCount();
+
+        isProcessing = true;
+        if (sendButton) sendButton.disabled = true;
+        showTypingIndicator();
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const response = await fetch('/chat/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ message: message, session_id: currentSessionId })
+            });
+
+            const data = await response.json();
+            hideTypingIndicator();
+
+            if (data.success) {
+                if (!currentSessionId) currentSessionId = data.session_id;
+                await streamMessageToChat(data.message, 'ai');
+                messageCount++;
+                updateMessageCount();
+                await loadChatHistoryList();
+            } else {
+                addMessageToChat(data.message || 'Sorry, I encountered an error. Please try again.', 'ai');
+                messageCount++;
+                updateMessageCount();
+                showToast(data.message || 'Failed to get response', 'error');
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            hideTypingIndicator();
+            addMessageToChat('Network error. Please check your connection and try again.', 'ai');
+            messageCount++;
+            updateMessageCount();
+            showToast('Network error. Please try again.', 'error');
+        } finally {
+            isProcessing = false;
+            if (sendButton) sendButton.disabled = false;
+            if (chatInput) chatInput.focus();
+        }
+    };
+
+    async function streamMessageToChat(fullMessage, type) {
+        const messageDiv = createMessageContainer(type, '');
+        const contentDiv = messageDiv.querySelector('.message-content');
+        if (!messagesContainer) return;
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const words = fullMessage.split(/(\s+)/);
+        let displayedText = '';
+        for (let i = 0; i < words.length; i++) {
+            displayedText += words[i];
+            if (contentDiv) contentDiv.innerHTML = formatMessage(escapeHtml(displayedText));
+            await new Promise(resolve => setTimeout(resolve, 8));
+            scrollToBottom();
+        }
+        addCopyButton(messageDiv, fullMessage);
+    }
+
     function formatMessage(message) {
         let formatted = message;
         formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>');
@@ -1354,93 +966,415 @@
         return div.innerHTML;
     }
 
-    // Open/Close functions
-    window.openChat = function() {
-        const sidebar = document.getElementById('aiChatSidebar');
-        const overlay = document.getElementById('chatOverlay');
-        if (sidebar && overlay) {
-            sidebar.classList.remove('hidden');
-            overlay.classList.remove('hidden');
-            setTimeout(() => {
-                sidebar.classList.remove('translate-x-full');
-                overlay.classList.remove('opacity-0');
-                overlay.classList.add('opacity-100');
-            }, 10);
-            initElements();
-            loadCurrentSession();
-            loadSuggestions();
-            setTimeout(() => {
-                if (chatInput) chatInput.focus();
-            }, 300);
-        }
-    };
+    // ==================== HISTORY FUNCTIONS ====================
 
-    window.closeChat = function() {
-        const sidebar = document.getElementById('aiChatSidebar');
-        const overlay = document.getElementById('chatOverlay');
-        if (sidebar && overlay) {
-            sidebar.classList.add('translate-x-full');
-            overlay.classList.remove('opacity-100');
-            overlay.classList.add('opacity-0');
-            setTimeout(() => {
-                sidebar.classList.add('hidden');
-                overlay.classList.add('hidden');
-            }, 300);
-        }
-    };
-
-    // Close modal when clicking outside
-    document.addEventListener('click', function(event) {
+    window.toggleChatHistory = async function() {
         const modal = document.getElementById('chatHistoryModal');
-        const historyBtn = event.target.closest('button[onclick*="toggleChatHistory"]');
-        const deleteModal = document.getElementById('deleteConfirmationModal');
-        const renameModal = document.getElementById('renameChatModal');
-        const shareModal = document.getElementById('shareChatModal');
-
-        if (modal && !modal.classList.contains('hidden')) {
-            if (!modal.contains(event.target) && !historyBtn) {
-                closeHistoryModal();
-            }
-        }
-
-        if (deleteModal && !deleteModal.classList.contains('hidden')) {
-            if (!deleteModal.contains(event.target)) {
-                closeDeleteModal();
-            }
-        }
-
-        if (renameModal && !renameModal.classList.contains('hidden')) {
-            if (!renameModal.contains(event.target)) {
-                closeRenameModal();
-            }
-        }
-
-        if (shareModal && !shareModal.classList.contains('hidden')) {
-            if (!shareModal.contains(event.target)) {
-                closeShareModal();
-            }
-        }
-    });
-
-    // Close on Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            const sidebar = document.getElementById('aiChatSidebar');
-            if (sidebar && !sidebar.classList.contains('hidden')) closeChat();
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('scale-95', 'opacity-0');
+                modal.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            await loadChatHistoryList();
+        } else {
             closeHistoryModal();
-            closeDeleteModal();
-            closeRenameModal();
-            closeShareModal();
         }
-    });
+    };
 
-    // Close on overlay click
-    document.getElementById('chatOverlay')?.addEventListener('click', closeChat);
+    function closeHistoryModal() {
+        const modal = document.getElementById('chatHistoryModal');
+        modal.classList.remove('scale-100', 'opacity-100');
+        modal.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
 
-    // Initialize on page load
+    async function loadChatHistoryList() {
+        const container = document.getElementById('chatHistoryList');
+        if (!container) return;
+        container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Loading sessions...</div>';
+
+        try {
+            const response = await fetch('/chat/sessions', {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && data.sessions && data.sessions.length > 0) {
+                let sessions = data.sessions;
+                sessions.sort((a, b) => {
+                    const aPinned = pinnedSessions.includes(a.id);
+                    const bPinned = pinnedSessions.includes(b.id);
+                    if (aPinned && !bPinned) return -1;
+                    if (!aPinned && bPinned) return 1;
+                    return new Date(b.updated_at) - new Date(a.updated_at);
+                });
+
+                container.innerHTML = sessions.map(session => {
+                    const isPinned = pinnedSessions.includes(session.id);
+                    return `
+                        <div class="history-item p-3 rounded-xl cursor-pointer bg-gray-800/30 hover:bg-gray-800/50 transition-all relative" onclick="loadChatSession('${session.id}')">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 min-w-0 pr-2">
+                                    <div class="flex items-center gap-2">
+                                        ${isPinned ? '<svg class="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.5v6l.5.5.5-.5v-6H18v-2l-2-2z"/></svg>' : ''}
+                                        <p class="text-sm text-white font-medium truncate">${escapeHtml(session.title || 'Conversation')}</p>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">${new Date(session.updated_at).toLocaleDateString()} • ${session.message_count || 0} messages</p>
+                                    <p class="text-xs text-gray-400 truncate mt-1">${escapeHtml(session.preview || 'No messages')}</p>
+                                </div>
+                                <div class="history-actions">
+                                    <button onclick="event.stopPropagation(); togglePinSession('${session.id}', event)" class="history-action-btn text-gray-400 hover:text-yellow-400" title="${isPinned ? 'Unpin' : 'Pin'}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); openRenameModal('${session.id}', '${escapeHtml(session.title || 'Conversation')}', event)" class="history-action-btn text-gray-400 hover:text-blue-400" title="Rename">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); openShareModal('${session.id}', event)" class="history-action-btn text-gray-400 hover:text-green-400" title="Share">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); openDeleteModal('${session.id}', '${escapeHtml(session.title || 'Conversation')}', event)" class="history-action-btn text-gray-400 hover:text-red-400" title="Delete">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">No conversations yet.<br>Start a new chat!</div>';
+            }
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+            container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">Failed to load sessions</div>';
+            showToast('Failed to load chat history', 'error');
+        }
+    }
+
+    window.loadChatSession = async function(sessionId) {
+        try {
+            const response = await fetch(`/chat/sessions/${sessionId}`, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && messagesContainer) {
+                currentSessionId = sessionId;
+                messagesContainer.innerHTML = '';
+                messageCount = 0;
+
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        addMessageToChat(msg.message, msg.role === 'user' ? 'user' : 'ai', false);
+                        messageCount++;
+                    });
+                    updateMessageCount();
+                } else {
+                    addWelcomeMessage();
+                }
+
+                scrollToBottom();
+                closeHistoryModal();
+                showToast('Conversation loaded successfully', 'success');
+                if (messageCount > 0 && suggestionsVisible) autoHideSuggestions();
+            } else {
+                showToast(data.message || 'Failed to load conversation', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading session:', error);
+            showToast('Failed to load conversation', 'error');
+        }
+    };
+
+    window.startNewChat = async function() {
+        try {
+            const response = await fetch('/chat/sessions', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.success && data.session) {
+                currentSessionId = data.session.id;
+                messagesContainer.innerHTML = '';
+                messageCount = 0;
+                addWelcomeMessage();
+                updateMessageCount();
+                showToast('New conversation started', 'success');
+                if (!suggestionsVisible) showSuggestions();
+                await loadChatHistoryList();
+                if (chatInput) chatInput.focus();
+            } else {
+                currentSessionId = null;
+                messagesContainer.innerHTML = '';
+                messageCount = 0;
+                addWelcomeMessage();
+                updateMessageCount();
+                showToast('New conversation started', 'success');
+                if (!suggestionsVisible) showSuggestions();
+                if (chatInput) chatInput.focus();
+            }
+        } catch (error) {
+            console.error('Error creating new session:', error);
+            currentSessionId = null;
+            messagesContainer.innerHTML = '';
+            messageCount = 0;
+            addWelcomeMessage();
+            updateMessageCount();
+            showToast('New conversation started', 'info');
+            if (!suggestionsVisible) showSuggestions();
+            if (chatInput) chatInput.focus();
+        }
+    };
+
+    window.clearAllHistory = async function() {
+        if (confirm('⚠️ WARNING: This will delete ALL conversations permanently. This action cannot be undone. Are you sure?')) {
+            try {
+                const response = await fetch('/chat/clear-all', {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    pinnedSessions = [];
+                    localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
+                    await startNewChat();
+                    await loadChatHistoryList();
+                    closeHistoryModal();
+                } else {
+                    showToast(data.message || 'Failed to clear history', 'error');
+                }
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                showToast('Failed to clear history', 'error');
+            }
+        }
+    };
+
+    window.togglePinSession = function(sessionId, event) {
+        event.stopPropagation();
+        if (pinnedSessions.includes(sessionId)) {
+            pinnedSessions = pinnedSessions.filter(id => id !== sessionId);
+            showToast('Chat unpinned', 'info');
+        } else {
+            pinnedSessions.push(sessionId);
+            showToast('Chat pinned', 'success');
+        }
+        localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
+        loadChatHistoryList();
+    };
+
+    window.openRenameModal = function(sessionId, currentTitle, event) {
+        event.stopPropagation();
+        pendingRenameSessionId = sessionId;
+        const input = document.getElementById('renameChatInput');
+        input.value = currentTitle;
+        const modal = document.getElementById('renameChatModal');
+        const content = document.getElementById('renameModalContent');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+            input.focus();
+            input.select();
+        }, 10);
+    };
+
+    function closeRenameModal() {
+        const modal = document.getElementById('renameChatModal');
+        const content = document.getElementById('renameModalContent');
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            pendingRenameSessionId = null;
+        }, 300);
+    }
+
+    window.confirmRenameSession = async function() {
+        const newTitle = document.getElementById('renameChatInput').value.trim();
+        if (!newTitle) {
+            showToast('Please enter a title', 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`/chat/sessions/${pendingRenameSessionId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ title: newTitle })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast('Chat renamed successfully', 'success');
+                closeRenameModal();
+                await loadChatHistoryList();
+            } else {
+                showToast(data.message || 'Failed to rename', 'error');
+            }
+        } catch (error) {
+            console.error('Error renaming session:', error);
+            showToast('Failed to rename chat', 'error');
+        }
+    };
+
+    window.openShareModal = function(sessionId, event) {
+        event.stopPropagation();
+        pendingShareSessionId = sessionId;
+        const shareLink = `${window.location.origin}/chat/share/${sessionId}`;
+        document.getElementById('shareChatLink').textContent = shareLink;
+        const modal = document.getElementById('shareChatModal');
+        const content = document.getElementById('shareModalContent');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    };
+
+    function closeShareModal() {
+        const modal = document.getElementById('shareChatModal');
+        const content = document.getElementById('shareModalContent');
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            pendingShareSessionId = null;
+        }, 300);
+    }
+
+    window.copyShareLink = function() {
+        const link = document.getElementById('shareChatLink').textContent;
+        navigator.clipboard.writeText(link);
+        showToast('Link copied to clipboard!', 'success');
+        closeShareModal();
+    };
+
+    window.openDeleteModal = function(sessionId, sessionTitle, event) {
+        event.stopPropagation();
+        pendingDeleteSessionId = sessionId;
+        const messageEl = document.getElementById('deleteModalMessage');
+        messageEl.innerHTML = `"<strong>${escapeHtml(sessionTitle)}</strong>" can't be recovered. Share links from it will be disabled.`;
+        const modal = document.getElementById('deleteConfirmationModal');
+        const content = document.getElementById('deleteModalContent');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    };
+
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteConfirmationModal');
+        const content = document.getElementById('deleteModalContent');
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            pendingDeleteSessionId = null;
+        }, 300);
+    }
+
+    window.confirmDeleteSession = async function() {
+        if (!pendingDeleteSessionId) return;
+        try {
+            const response = await fetch(`/chat/sessions/${pendingDeleteSessionId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+            closeDeleteModal();
+            if (data.success) {
+                showToast(data.message, 'success');
+                await loadChatHistoryList();
+                if (currentSessionId == pendingDeleteSessionId) await startNewChat();
+                if (pinnedSessions.includes(pendingDeleteSessionId)) {
+                    pinnedSessions = pinnedSessions.filter(id => id !== pendingDeleteSessionId);
+                    localStorage.setItem('pinnedSessions', JSON.stringify(pinnedSessions));
+                }
+            } else {
+                showToast(data.message || 'Failed to delete conversation', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting session:', error);
+            showToast('Failed to delete conversation', 'error');
+        } finally {
+            pendingDeleteSessionId = null;
+        }
+    };
+
+    // ==================== INITIALIZATION ====================
+
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, initializing chat...');
         initElements();
         initTextarea();
         loadSuggestions();
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('chatHistoryModal');
+            const historyBtn = event.target.closest('button[onclick*="toggleChatHistory"]');
+            const deleteModal = document.getElementById('deleteConfirmationModal');
+            const renameModal = document.getElementById('renameChatModal');
+            const shareModal = document.getElementById('shareChatModal');
+
+            if (modal && !modal.classList.contains('hidden')) {
+                if (!modal.contains(event.target) && !historyBtn) closeHistoryModal();
+            }
+            if (deleteModal && !deleteModal.classList.contains('hidden')) {
+                if (!deleteModal.contains(event.target)) closeDeleteModal();
+            }
+            if (renameModal && !renameModal.classList.contains('hidden')) {
+                if (!renameModal.contains(event.target)) closeRenameModal();
+            }
+            if (shareModal && !shareModal.classList.contains('hidden')) {
+                if (!shareModal.contains(event.target)) closeShareModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const sidebar = document.getElementById('aiChatSidebar');
+                if (sidebar && !sidebar.classList.contains('hidden')) closeChat();
+                closeHistoryModal();
+                closeDeleteModal();
+                closeRenameModal();
+                closeShareModal();
+            }
+        });
+
+        // Close on overlay click
+        document.getElementById('chatOverlay')?.addEventListener('click', closeChat);
     });
 </script>
